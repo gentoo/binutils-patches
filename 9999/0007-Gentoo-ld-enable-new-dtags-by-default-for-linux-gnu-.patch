@@ -1,7 +1,7 @@
-From 14ba11502cbc93e938e0b43e9648aedb7462ddeb Mon Sep 17 00:00:00 2001
+From cf8983d602c56eb31ee0e356df670d9c2876ce15 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sun, 13 Oct 2019 05:25:28 +0200
-Subject: [PATCH 13/16] Gentoo: ld: enable new dtags by default for linux/gnu
+Subject: [PATCH 7/9] Gentoo: ld: enable new dtags by default for linux/gnu
  targets
 
 Original author: Mike Frysinger <vapier@gentoo.org>

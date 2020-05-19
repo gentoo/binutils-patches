@@ -1,7 +1,7 @@
 From c251ab646d98b3f0e8f8b1ae5e94c672325477e2 Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Tue, 10 Oct 2017 22:53:53 +0200
-Subject: [PATCH 03/16] Gentoo: gold/ld: add support for poisoned system
+Subject: [PATCH 3/9] Gentoo: gold/ld: add support for poisoned system
  directories
 
 This is based on the old CodeSourcery patch written by Joseph Myers to add

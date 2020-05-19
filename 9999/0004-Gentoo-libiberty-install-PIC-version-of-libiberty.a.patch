@@ -1,7 +1,7 @@
 From c11463f5dbeb53c2a600a5b4a3982368ad149ba1 Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Fri, 7 Jan 2005 00:15:53 -0500
-Subject: [PATCH 04/16] Gentoo: libiberty: install PIC version of libiberty.a
+Subject: [PATCH 4/9] Gentoo: libiberty: install PIC version of libiberty.a
 
 This will install a PIC version of libiberty.a by overwriting the non-PIC
 version of libiberty.a while compiling.  We do this because there is no

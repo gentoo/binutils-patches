@@ -1,7 +1,7 @@
 From 5e2144e41600a83f6127eb44d739ed170d78ac7f Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Mon, 16 May 2005 22:10:19 -0400
-Subject: [PATCH 01/16] Gentoo: ld: always warn about textrels in files
+Subject: [PATCH 1/9] Gentoo: ld: always warn about textrels in files
 
 textrels are bad for forcing copy-on-write (this affects everyone), and for
 security/runtime code generation, this affects security ppl.  But in either

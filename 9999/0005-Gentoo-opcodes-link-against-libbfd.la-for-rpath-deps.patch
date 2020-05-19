@@ -1,7 +1,7 @@
 From b4c9e06c3fb0ede497bcc51dde6c9756efe124ad Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Tue, 5 Jul 2016 20:24:00 +0545
-Subject: [PATCH 05/16] Gentoo: opcodes: link against libbfd.la for rpath deps
+Subject: [PATCH 5/9] Gentoo: opcodes: link against libbfd.la for rpath deps
 
 The reason opcodes doesn't link against libbfd.la is to workaround a
 libtool bug where it uses installed -L paths ahead of DESTDIR paths.

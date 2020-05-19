@@ -1,7 +1,7 @@
-From f1d34965ce140071bb77313bbca01914ace59e27 Mon Sep 17 00:00:00 2001
+From eefafabed03c163287326afaadc4cc0e5840ea7b Mon Sep 17 00:00:00 2001
 From: Sergei Trofimovich <slyfox@gentoo.org>
 Date: Wed, 12 Sep 2018 23:44:29 +0100
-Subject: [PATCH 11/16] Gentoo: add --with-extra-soversion-suffix= option
+Subject: [PATCH 6/9] Gentoo: add --with-extra-soversion-suffix= option
 
 --with-extra-soversion-suffix= will allow Gentoo to
 distinct libbfd.so and libopcodes.so to have more precise

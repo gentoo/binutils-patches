@@ -1,7 +1,7 @@
 From 19ecd671bddd33f3afff169f26c55101c90c4afc Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sun, 3 Jun 2018 21:12:16 +0200
-Subject: [PATCH 02/16] Gentoo: Add an option --no-warn-shared-textrel
+Subject: [PATCH 2/9] Gentoo: Add an option --no-warn-shared-textrel
  (self-explanatory)
 
 ---
