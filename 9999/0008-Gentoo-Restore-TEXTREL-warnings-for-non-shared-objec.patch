@@ -1,0 +1,34 @@
+From 3439646abc93066af8cc651940f30fd0f9b99760 Mon Sep 17 00:00:00 2001
+From: Sergei Trofimovich <slyfox@gentoo.org>
+Date: Thu, 1 Mar 2018 12:35:03 +0100
+Subject: [PATCH 08/16] Gentoo: Restore TEXTREL warnings for non-shared objects
+
+---
+ bfd/elflink.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/bfd/elflink.c b/bfd/elflink.c
+index 90ada7a1cc..b4636885aa 100644
+--- a/bfd/elflink.c
++++ b/bfd/elflink.c
+@@ -12934,7 +12934,7 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
+ 	goto error_return;
+ 
+       /* Check for DT_TEXTREL (late, in case the backend removes it).  */
+-      if (((info->warn_shared_textrel && bfd_link_pic (info))
++      if ((info->warn_shared_textrel
+ 	   || info->error_textrel)
+ 	  && (o = bfd_get_linker_section (dynobj, ".dynamic")) != NULL)
+ 	{
+@@ -12955,7 +12955,7 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
+ 		      (_("%P%X: read-only segment has dynamic relocations\n"));
+ 		  else
+ 		    info->callbacks->einfo
+-		      (_("%P: warning: creating a DT_TEXTREL in a shared object\n"));
++		      (_("%P: warning: creating a DT_TEXTREL in object\n"));
+ 		  break;
+ 		}
+ 	    }
+-- 
+2.26.2
+

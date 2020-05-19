@@ -1,0 +1,30 @@
+From 5e2144e41600a83f6127eb44d739ed170d78ac7f Mon Sep 17 00:00:00 2001
+From: Mike Frysinger <vapier@gentoo.org>
+Date: Mon, 16 May 2005 22:10:19 -0400
+Subject: [PATCH 01/16] Gentoo: ld: always warn about textrels in files
+
+textrels are bad for forcing copy-on-write (this affects everyone), and for
+security/runtime code generation, this affects security ppl.  But in either
+case, it doesn't matter who needs textrels, it's the very fact that they're
+needed at all.
+
+(cherry picked from commit cd6411ad57aab78686f67cbbc1ed70ee810ad335)
+---
+ ld/ldmain.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/ld/ldmain.c b/ld/ldmain.c
+index 04a3f7a511..c3f473f661 100644
+--- a/ld/ldmain.c
++++ b/ld/ldmain.c
+@@ -299,6 +299,7 @@ main (int argc, char **argv)
+   link_info.dynamic_undefined_weak = -1;
+   link_info.pei386_auto_import = -1;
+   link_info.spare_dynamic_tags = 5;
++  link_info.warn_shared_textrel = TRUE;
+   link_info.path_separator = ':';
+ #ifdef DEFAULT_FLAG_COMPRESS_DEBUG
+   link_info.compress_debug = COMPRESS_DEBUG_GABI_ZLIB;
+-- 
+2.26.2
+

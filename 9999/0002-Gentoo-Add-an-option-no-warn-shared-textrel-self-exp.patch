@@ -1,0 +1,66 @@
+From 19ecd671bddd33f3afff169f26c55101c90c4afc Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
+Date: Sun, 3 Jun 2018 21:12:16 +0200
+Subject: [PATCH 02/16] Gentoo: Add an option --no-warn-shared-textrel
+ (self-explanatory)
+
+---
+ ld/ld.texi  | 4 ++++
+ ld/ldlex.h  | 1 +
+ ld/lexsup.c | 6 ++++++
+ 3 files changed, 11 insertions(+)
+
+diff --git a/ld/ld.texi b/ld/ld.texi
+index 4dc78e65fa..621d05dc05 100644
+--- a/ld/ld.texi
++++ b/ld/ld.texi
+@@ -2408,6 +2408,10 @@ the section (@pxref{SECTIONS}).
+ @item --warn-shared-textrel
+ Warn if the linker adds a DT_TEXTREL to a shared object.
+ 
++@kindex --no-warn-shared-textrel
++@item --no-warn-shared-textrel
++Do not warn if the linker adds a DT_TEXTREL to a shared object.
++
+ @kindex --warn-alternate-em
+ @item --warn-alternate-em
+ Warn if an object has alternate ELF machine code.
+diff --git a/ld/ldlex.h b/ld/ldlex.h
+index 22b928d2d9..aeaea4dfee 100644
+--- a/ld/ldlex.h
++++ b/ld/ldlex.h
+@@ -131,6 +131,7 @@ enum option_values
+   OPTION_WARN_UNRESOLVED_SYMBOLS,
+   OPTION_ERROR_UNRESOLVED_SYMBOLS,
+   OPTION_WARN_SHARED_TEXTREL,
++  OPTION_NO_WARN_SHARED_TEXTREL,
+   OPTION_WARN_ALTERNATE_EM,
+   OPTION_REDUCE_MEMORY_OVERHEADS,
+ #ifdef ENABLE_PLUGINS
+diff --git a/ld/lexsup.c b/ld/lexsup.c
+index c02041d5f1..c5edc25793 100644
+--- a/ld/lexsup.c
++++ b/ld/lexsup.c
+@@ -519,6 +519,9 @@ static const struct ld_option ld_options[] =
+   { {"warn-shared-textrel", no_argument, NULL, OPTION_WARN_SHARED_TEXTREL},
+     '\0', NULL, N_("Warn if shared object has DT_TEXTREL"),
+     TWO_DASHES },
++  { {"no-warn-shared-textrel", no_argument, NULL, OPTION_NO_WARN_SHARED_TEXTREL},
++    '\0', NULL, N_("Do not warn if shared object has DT_TEXTREL"),
++    TWO_DASHES },
+   { {"warn-alternate-em", no_argument, NULL, OPTION_WARN_ALTERNATE_EM},
+     '\0', NULL, N_("Warn if an object has alternate ELF machine code"),
+     TWO_DASHES },
+@@ -1449,6 +1452,9 @@ parse_args (unsigned argc, char **argv)
+ 	case OPTION_WARN_SHARED_TEXTREL:
+ 	  link_info.warn_shared_textrel = TRUE;
+ 	  break;
++	case OPTION_NO_WARN_SHARED_TEXTREL:
++	  link_info.warn_shared_textrel = FALSE;
++	  break;
+ 	case OPTION_WARN_ALTERNATE_EM:
+ 	  link_info.warn_alternate_em = TRUE;
+ 	  break;
+-- 
+2.26.2
+

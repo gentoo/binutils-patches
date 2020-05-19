@@ -1,0 +1,49 @@
+From 14ba11502cbc93e938e0b43e9648aedb7462ddeb Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
+Date: Sun, 13 Oct 2019 05:25:28 +0200
+Subject: [PATCH 13/16] Gentoo: ld: enable new dtags by default for linux/gnu
+ targets
+
+Original author: Mike Frysinger <vapier@gentoo.org>
+
+The "new" dtags options have been around for 14+ years now, so for Linux
+and GNU targets, enable them by default.
+
+2012-01-21  Mike Frysinger  <vapier@gentoo.org>
+
+        * emultempl/elf32.em (gld${EMULATION_NAME}_before_parse): Set
+        link_info.new_dtags to TRUE for linux/gnu targets.
+        * NEWS: Mention new dtags default.
+
+2013-01-22  Roland McGrath  <mcgrathr@google.com>
+
+        * emultempl/elf32.em (gld${EMULATION_NAME}_before_parse): Set
+        new_dtags to TRUE for *-*-nacl* targets.
+---
+ ld/emultempl/elf.em | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/ld/emultempl/elf.em b/ld/emultempl/elf.em
+index eac2ce2f4c..7f92134070 100644
+--- a/ld/emultempl/elf.em
++++ b/ld/emultempl/elf.em
+@@ -81,6 +81,16 @@ gld${EMULATION_NAME}_before_parse (void)
+   input_flags.dynamic = ${DYNAMIC_LINK-TRUE};
+   config.has_shared = `if test -n "$GENERATE_SHLIB_SCRIPT" ; then echo TRUE ; else echo FALSE ; fi`;
+   config.separate_code = `if test "x${SEPARATE_CODE}" = xyes ; then echo TRUE ; else echo FALSE ; fi`;
++EOF
++
++case ${target} in
++  *-*-linux-* | *-*-k*bsd*-* | *-*-gnu* | *-*-nacl*)
++    fragment <<EOF
++  link_info.new_dtags = TRUE;
++EOF
++    ;;
++esac
++fragment <<EOF
+   link_info.check_relocs_after_open_input = TRUE;
+   link_info.relro = DEFAULT_LD_Z_RELRO;
+   link_info.separate_code = DEFAULT_LD_Z_SEPARATE_CODE;
+-- 
+2.26.2
+

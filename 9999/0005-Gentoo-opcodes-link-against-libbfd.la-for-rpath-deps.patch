@@ -1,0 +1,49 @@
+From b4c9e06c3fb0ede497bcc51dde6c9756efe124ad Mon Sep 17 00:00:00 2001
+From: Mike Frysinger <vapier@gentoo.org>
+Date: Tue, 5 Jul 2016 20:24:00 +0545
+Subject: [PATCH 05/16] Gentoo: opcodes: link against libbfd.la for rpath deps
+
+The reason opcodes doesn't link against libbfd.la is to workaround a
+libtool bug where it uses installed -L paths ahead of DESTDIR paths.
+The downside is that the library itself lacks rpath tags to find the
+right version of libbfd.so.
+
+Since Gentoo has patched the libtool bug for a while, we don't need
+the workaround.  Use the .la file so we get the rpath tags.
+
+URL: https://bugs.gentoo.org/563934
+(cherry picked from commit 662586237b0b00ee881e79b56f6234ff36e8bfe6)
+---
+ opcodes/configure    | 2 +-
+ opcodes/configure.ac | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/opcodes/configure b/opcodes/configure
+index 42be5febad..7b8ee51cc3 100755
+--- a/opcodes/configure
++++ b/opcodes/configure
+@@ -12797,7 +12797,7 @@ if test "$enable_shared" = "yes"; then
+           SHARED_LIBADD="-Wl,`pwd`/../bfd/.libs/libbfd.sl ${SHARED_LIBADD}"
+ 	  ;;
+ 	*)
+-          SHARED_LIBADD="-Wl,`pwd`/../bfd/.libs/libbfd.so ${SHARED_LIBADD}"
++          SHARED_LIBADD="../bfd/libbfd.la ${SHARED_LIBADD}"
+ 	  ;;
+       esac
+       SHARED_DEPENDENCIES="../bfd/libbfd.la"
+diff --git a/opcodes/configure.ac b/opcodes/configure.ac
+index 00be9c88be..b7a511ac58 100644
+--- a/opcodes/configure.ac
++++ b/opcodes/configure.ac
+@@ -188,7 +188,7 @@ changequote([,])dnl
+           SHARED_LIBADD="-Wl,`pwd`/../bfd/.libs/libbfd.sl ${SHARED_LIBADD}"
+ 	  ;;
+ 	*)
+-          SHARED_LIBADD="-Wl,`pwd`/../bfd/.libs/libbfd.so ${SHARED_LIBADD}"
++          SHARED_LIBADD="../bfd/libbfd.la ${SHARED_LIBADD}"
+ 	  ;;
+       esac
+       SHARED_DEPENDENCIES="../bfd/libbfd.la"
+-- 
+2.26.2
+

@@ -1,0 +1,22 @@
+From fab9a66210e065ff5a14d4bc70841406cdecc62e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
+Date: Mon, 16 Jul 2018 12:20:37 +0200
+Subject: [PATCH 10/16] Gentoo: Fix textrel warning format test
+
+---
+ ld/testsuite/ld-i386/warn1.d | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ld/testsuite/ld-i386/warn1.d b/ld/testsuite/ld-i386/warn1.d
+index 3319308d33..49bcb5171f 100644
+--- a/ld/testsuite/ld-i386/warn1.d
++++ b/ld/testsuite/ld-i386/warn1.d
+@@ -1,4 +1,4 @@
+ #name: --warn-shared-textrel --fatal-warnings
+ #as: --32
+ #ld: -shared -melf_i386 --warn-shared-textrel --fatal-warnings
+-#error: .*warning: creating a DT_TEXTREL in object.
++#error: .*warning: creating a DT_TEXTREL in object
+-- 
+2.26.2
+
