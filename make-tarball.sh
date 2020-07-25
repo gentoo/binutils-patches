@@ -1,5 +1,8 @@
 #!/bin/bash
 
+mypathbinutils=${GENTOO_BINUTILS_REPO:-~/Gentoo/misc/binutils-gdb}
+mypathpatches=${GENTOO_BINUTILS_PATCHES_REPO:-~/Gentoo/misc/binutils-patches}
+
 PN="binutils"
 PV=$1
 pver=$2
@@ -10,12 +13,37 @@ if [[ -z ${PV} ]] ; then
 	exit 1
 fi
 
-# check that we're in the root of a binutils-gdb git repo
+# check that we have a gentoo binutils patches git repo
 
-if [[ ! -f COPYING.LIBGLOSS ]] || [[ ! -d .git ]] ; then
-	echo "Error: You need to call this script in the main directory of a Gentoo binutils-gdb git clone"
+if [[ ! -f "${mypathpatches}/README.Gentoo.patches" ]] || [[ ! -d "${mypathpatches}/All" ]] ; then
+	echo "Error: GENTOO_BINUTILS_PATCHES_REPO needs to point to the main directory of a Gentoo binutils patchset git clone"
 	exit 1
 fi
+
+# check that we have a gentoo binutils git repo
+
+if [[ ! -f "${mypathbinutils}/COPYING.LIBGLOSS" ]] || [[ ! -d "${mypathbinutils}/.git" ]] ; then
+	echo "Error: GENTOO_BINUTILS_REPO needs to point to the main directory of a Gentoo binutils-gdb git clone"
+	exit 1
+fi
+
+# go into the gentoo patches repo
+
+cd "${mypathpatches}"
+
+# check that the working directory is clean
+
+mystatusinfo=$(git status --porcelain)
+if [[ ! -z "${mystatusinfo}" ]] ; then
+	echo "Error: Your binutils patches working directory is not clean"
+	exit 1
+fi
+
+mydescpatches=$(git describe)
+
+# go into the binutils glibc repo
+
+cd "${mypathbinutils}"
 
 # check that we're on a branch gentoo/${PV}
 
@@ -61,22 +89,29 @@ rm -f 0*.patch
 
 # check if we have to override the upstream tag
 
+if [[ "${PV}" == "9999" ]]; then
+	# working with master is not supported anymore
+	echo "Patchsets for git master are not supported anymore"
+    exit 1
+fi
+
 mytaginfo=$(git tag -l|grep "gentoo/binutils-${PV}-upstream")
 if [[ ! -z "${mytaginfo}" ]] ; then
 	starttag="gentoo/binutils-${PV}-upstream"
 else
 	starttag="binutils-${PV//./_}"
 fi
-if [[ "${PV}" == "9999" ]]; then
-	starttag="master"
-fi
+
 echo "Starting from tag ${starttag}"
 
 mkdir -p tmp/patch
 
 # copy README.Gentoo.patches
 
-cp scripts/gentoo/README.Gentoo.patches tmp/ || exit 1
+cp "${mypathpatches}/README.Gentoo.patches" tmp/ || exit 1
+
+echo >> "tmp/README.Gentoo.patches"
+echo "Generated with make-tarball.sh ${mydescpatches}" >> "tmp/README.Gentoo.patches"
 
 # create and rename patches
 
@@ -86,6 +121,7 @@ git format-patch ${starttag}..HEAD > /dev/null || exit 1
 # - [no-tarball]: not related to upstream tarball
 # - [no-patch]: not related to upstream patches
 # - "Automatic date update in version.in": daily bumps
+# from 2.35 on this should not be needed anymore (no such commits)
 rm -f 0???-no-tarball-*.patch
 rm -f 0???-no-patch-*.patch
 rm -f 0???-Automatic-date-update-in-version.in.patch
@@ -97,8 +133,8 @@ done
 # add the extra patch if needed
 
 if [[ "${PV}" != "9999" ]]; then
-	cp scripts/gentoo/0000-Gentoo-Git-is-development tmp/patch/0000-Gentoo-Git-is-development.patch || exit 1
-	cp scripts/gentoo/9999-Gentoo-We-make-a-release tmp/patch/9999-Gentoo-We-make-a-release.patch || exit 1
+	cp "${mypathpatches}/All/0000-Gentoo-Git-is-development" tmp/patch/0000-Gentoo-Git-is-development.patch || exit 1
+	cp "${mypathpatches}/All/9999-Gentoo-We-make-a-release" tmp/patch/9999-Gentoo-We-make-a-release.patch || exit 1
 fi
 
 # add a history file
