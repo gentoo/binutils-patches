@@ -130,12 +130,9 @@ for myname in 0*.patch ; do
 	mv ${myname} tmp/patch/ || exit 1
 done
 
-# add the extra patch if needed
+# add the extra patch
 
-if [[ "${PV}" != "9999" ]]; then
-	cp "${mypathpatches}/All/0000-Gentoo-Git-is-development" tmp/patch/0000-Gentoo-Git-is-development.patch || exit 1
-	cp "${mypathpatches}/All/9999-Gentoo-We-make-a-release" tmp/patch/9999-Gentoo-We-make-a-release.patch || exit 1
-fi
+cp "${mypathpatches}/All/9999-Gentoo-We-make-a-release" tmp/patch/9999-Gentoo-We-make-a-release.patch || exit 1
 
 # add a history file
 
