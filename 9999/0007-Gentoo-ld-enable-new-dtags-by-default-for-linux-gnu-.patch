@@ -1,8 +1,7 @@
-From cf8983d602c56eb31ee0e356df670d9c2876ce15 Mon Sep 17 00:00:00 2001
+From 7cefac2aa8ff79d6e2eff1fb4c94346314563fc8 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sun, 13 Oct 2019 05:25:28 +0200
-Subject: [PATCH 7/9] Gentoo: ld: enable new dtags by default for linux/gnu
- targets
+Subject: [PATCH] Gentoo: ld: enable new dtags by default for linux/gnu targets
 
 Original author: Mike Frysinger <vapier@gentoo.org>
 
@@ -24,7 +23,7 @@ and GNU targets, enable them by default.
  1 file changed, 10 insertions(+)
 
 diff --git a/ld/emultempl/elf.em b/ld/emultempl/elf.em
-index eac2ce2f4c..7f92134070 100644
+index 356f34538b..579e52253e 100644
 --- a/ld/emultempl/elf.em
 +++ b/ld/emultempl/elf.em
 @@ -81,6 +81,16 @@ gld${EMULATION_NAME}_before_parse (void)
@@ -42,8 +41,8 @@ index eac2ce2f4c..7f92134070 100644
 +esac
 +fragment <<EOF
    link_info.check_relocs_after_open_input = TRUE;
-   link_info.relro = DEFAULT_LD_Z_RELRO;
-   link_info.separate_code = DEFAULT_LD_Z_SEPARATE_CODE;
+ EOF
+ if test -n "$COMMONPAGESIZE"; then
 -- 
 2.26.2
 
