@@ -15,7 +15,11 @@ original creators, etc...
  === Where ===
  =============
 
-Currently, https://github.com/gentoo/binutils-gdb
+https://gitweb.gentoo.org/fork/binutils-gdb.git/
+
+The patch generation script and the base patchset for the start of a new
+version branch (or for use with binutils git master) can be found at
+https://gitweb.gentoo.org/proj/toolchain/binutils-patches.git/
 
  ===========
  === How ===
