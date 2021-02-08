@@ -1,12 +1,25 @@
-Gentoo: We make a release, so switch development flag off
+From 675770ab9aeb5753c090b161bdb711e09775a8ce Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
+Date: Mon, 8 Feb 2021 23:58:05 +0200
+Subject: [PATCH] We make a release
 
+---
+ bfd/development.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bfd/development.sh b/bfd/development.sh
+index a376b02d869..eb9762e4426 100644
 --- a/bfd/development.sh
 +++ b/bfd/development.sh
-@@ -16,5 +16,5 @@
+@@ -16,7 +16,7 @@
  # along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
  # Controls whether to enable development-mode features by default.
 -development=true
 +development=false
  
+ # Indicate whether this is a release branch.
+ experimental=false
+-- 
+2.26.2
 
