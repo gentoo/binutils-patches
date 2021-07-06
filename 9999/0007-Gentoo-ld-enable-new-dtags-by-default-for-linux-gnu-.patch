@@ -27,20 +27,20 @@ index 356f34538b..579e52253e 100644
 --- a/ld/emultempl/elf.em
 +++ b/ld/emultempl/elf.em
 @@ -81,6 +81,16 @@ gld${EMULATION_NAME}_before_parse (void)
-   input_flags.dynamic = ${DYNAMIC_LINK-TRUE};
-   config.has_shared = `if test -n "$GENERATE_SHLIB_SCRIPT" ; then echo TRUE ; else echo FALSE ; fi`;
-   config.separate_code = `if test "x${SEPARATE_CODE}" = xyes ; then echo TRUE ; else echo FALSE ; fi`;
+   input_flags.dynamic = ${DYNAMIC_LINK-true};
+   config.has_shared = `if test -n "$GENERATE_SHLIB_SCRIPT" ; then echo true ; else echo false ; fi`;
+   config.separate_code = `if test "x${SEPARATE_CODE}" = xyes ; then echo true ; else echo false ; fi`;
 +EOF
 +
 +case ${target} in
 +  *-*-linux-* | *-*-k*bsd*-* | *-*-gnu* | *-*-nacl*)
 +    fragment <<EOF
-+  link_info.new_dtags = TRUE;
++  link_info.new_dtags = true;
 +EOF
 +    ;;
 +esac
 +fragment <<EOF
-   link_info.check_relocs_after_open_input = TRUE;
+   link_info.check_relocs_after_open_input = true;
  EOF
  if test -n "$COMMONPAGESIZE"; then
 -- 
