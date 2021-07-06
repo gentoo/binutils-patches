@@ -14,13 +14,13 @@ index b9e3c6d817..bb4ef987b3 100644
 +++ b/binutils/testsuite/lib/binutils-common.exp
 @@ -1125,7 +1125,7 @@ proc run_dump_test { name {extra_options {}} } {
  
-             # Add -L$srcdir/$subdir so that the linker command can use
-             # linker scripts in the source directory.
--            set cmd "$LD $ld_extra_opt $LDFLAGS -L$srcdir/$subdir \
-+            set cmd "$LD --hash-style=sysv $ld_extra_opt $LDFLAGS -L$srcdir/$subdir \
+ 	    # Add -L$srcdir/$subdir so that the linker command can use
+ 	    # linker scripts in the source directory.
+-	    set cmd "$LD $ld_extra_opt $LDFLAGS -L$srcdir/$subdir \
++	    set cmd "$LD --hash-style=sysv $ld_extra_opt $LDFLAGS -L$srcdir/$subdir \
  		   $opts(ld) -o $objfile $objfiles $opts(ld_after_inputfiles)"
  
-             # If needed then check for, or add a -Map option.
+	    # If needed then check for, or add a -Map option.
 diff --git a/ld/testsuite/lib/ld-lib.exp b/ld/testsuite/lib/ld-lib.exp
 index 015eda6eb9..0b945b539d 100644
 --- a/ld/testsuite/lib/ld-lib.exp
