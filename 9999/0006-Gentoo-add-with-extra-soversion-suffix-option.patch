@@ -1,7 +1,10 @@
-From eefafabed03c163287326afaadc4cc0e5840ea7b Mon Sep 17 00:00:00 2001
+From 235f1f862fb9bf77e2b9f62c24db0ca801c4a057 Mon Sep 17 00:00:00 2001
 From: Sergei Trofimovich <slyfox@gentoo.org>
-Date: Wed, 12 Sep 2018 23:44:29 +0100
-Subject: [PATCH 6/9] Gentoo: add --with-extra-soversion-suffix= option
+Date: Tue, 20 Jul 2021 21:12:38 +0200
+Subject: [PATCH 4/6] Gentoo: add --with-extra-soversion-suffix= option
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
 --with-extra-soversion-suffix= will allow Gentoo to
 distinct libbfd.so and libopcodes.so to have more precise
@@ -21,6 +24,8 @@ built with different flags (see https://bugs.gentoo.org/663690).
 
 Bug: https://bugs.gentoo.org/666100
 Signed-off-by: Sergei Trofimovich <slyfox@gentoo.org>
+
+Ported to binutils 2.37 Andreas K. Hüttel <dilfridge@gentoo.org>
 ---
  bfd/Makefile.am  |  5 +++++
  bfd/Makefile.in  |  4 ++++
@@ -29,7 +34,7 @@ Signed-off-by: Sergei Trofimovich <slyfox@gentoo.org>
  4 files changed, 29 insertions(+)
 
 diff --git a/bfd/Makefile.am b/bfd/Makefile.am
-index b6088a3c4a..3f5cf81ca4 100644
+index ed2f701805d..dab3bfc8ed7 100644
 --- a/bfd/Makefile.am
 +++ b/bfd/Makefile.am
 @@ -59,6 +59,8 @@ bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
@@ -41,7 +46,7 @@ index b6088a3c4a..3f5cf81ca4 100644
  # bfd.h goes here, for now
  BFD_H = bfd.h
  
-@@ -958,6 +960,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+@@ -952,6 +954,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
  	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
  	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
  	fi ;\
@@ -52,7 +57,7 @@ index b6088a3c4a..3f5cf81ca4 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/Makefile.in b/bfd/Makefile.in
-index dd3474d92b..911232212b 100644
+index 12807d99760..572df143487 100644
 --- a/bfd/Makefile.in
 +++ b/bfd/Makefile.in
 @@ -318,6 +318,7 @@ ECHO_T = @ECHO_T@
@@ -63,7 +68,7 @@ index dd3474d92b..911232212b 100644
  FGREP = @FGREP@
  GENCAT = @GENCAT@
  GMSGFMT = @GMSGFMT@
-@@ -2071,6 +2072,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+@@ -2063,6 +2064,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
  	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
  	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
  	fi ;\
@@ -74,7 +79,7 @@ index dd3474d92b..911232212b 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/configure b/bfd/configure
-index 59b867bbbf..fa34069f2a 100755
+index 41586f00f93..f0acf160913 100755
 --- a/bfd/configure
 +++ b/bfd/configure
 @@ -696,6 +696,7 @@ WARN_CFLAGS
@@ -85,7 +90,7 @@ index 59b867bbbf..fa34069f2a 100755
  DEBUGDIR
  PLUGINS_FALSE
  PLUGINS_TRUE
-@@ -833,6 +834,7 @@ enable_secureplt
+@@ -835,6 +836,7 @@ enable_secureplt
  enable_separate_code
  enable_leading_mingw64_underscores
  with_separate_debug_dir
@@ -93,7 +98,7 @@ index 59b867bbbf..fa34069f2a 100755
  with_pkgversion
  with_bugurl
  enable_werror
-@@ -1508,6 +1510,8 @@ Optional Packages:
+@@ -1511,6 +1513,8 @@ Optional Packages:
    --with-separate-debug-dir=DIR
                            Look for global separate debug info in DIR
                            [[default=LIBDIR/debug]]
@@ -102,7 +107,7 @@ index 59b867bbbf..fa34069f2a 100755
    --with-pkgversion=PKG   Use PKG in the version string in place of "GNU
                            Binutils"
    --with-bugurl=URL       Direct users to URL to report a bug
-@@ -12516,6 +12520,15 @@ fi
+@@ -11913,6 +11917,15 @@ fi
  
  
  
@@ -119,10 +124,10 @@ index 59b867bbbf..fa34069f2a 100755
  
  # Check whether --with-pkgversion was given.
 diff --git a/bfd/configure.ac b/bfd/configure.ac
-index 0528e54c3b..50b2b4e06e 100644
+index fec067b2135..8c9ef9a04c0 100644
 --- a/bfd/configure.ac
 +++ b/bfd/configure.ac
-@@ -133,6 +133,13 @@ AC_ARG_WITH(separate-debug-dir,
+@@ -169,6 +169,13 @@ AC_ARG_WITH(separate-debug-dir,
  [DEBUGDIR="${withval}"])
  AC_SUBST(DEBUGDIR)
  
@@ -134,8 +139,8 @@ index 0528e54c3b..50b2b4e06e 100644
 +AC_SUBST(EXTRA_SOVERSION_SUFFIX)
 +
  ACX_PKGVERSION([GNU Binutils])
- ACX_BUGURL([http://www.sourceware.org/bugzilla/])
+ ACX_BUGURL([https://www.sourceware.org/bugzilla/])
  
 -- 
-2.26.2
+2.31.1
 
