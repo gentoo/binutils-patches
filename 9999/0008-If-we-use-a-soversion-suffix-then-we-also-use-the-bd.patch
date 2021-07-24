@@ -1,0 +1,111 @@
+From 235448cc5c53641417e17fd39ced95a21053c8ca Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
+Date: Sat, 24 Jul 2021 19:25:32 +0200
+Subject: [PATCH 2/2] If we use a soversion suffix, then we also use the bdf
+ version as soversion
+
+---
+ libctf/Makefile.am  | 3 ++-
+ libctf/Makefile.in  | 3 ++-
+ libctf/configure    | 8 ++++++--
+ libctf/configure.ac | 2 ++
+ 4 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/libctf/Makefile.am b/libctf/Makefile.am
+index eabc7fa8394..e1304e8e89b 100644
+--- a/libctf/Makefile.am
++++ b/libctf/Makefile.am
+@@ -22,6 +22,7 @@ ACLOCAL_AMFLAGS = -I .. -I ../config -I ../bfd
+ AUTOMAKE_OPTIONS = dejagnu foreign no-texinfo.tex
+ 
+ EXTRA_SOVERSION_SUFFIX = @EXTRA_SOVERSION_SUFFIX@
++BFD_VERSION = @BFD_VERSION@
+ 
+ # This is where we get zlib from.  zlibdir is -L../zlib and zlibinc is
+ # -I../zlib, unless we were configured with --with-system-zlib, in which
+@@ -47,7 +48,7 @@ endif
+ # a supplement to the soversion. So we need to switch tracks and be creative.
+ 
+ if HAVE_EXTRA_SOVERSION_SUFFIX
+-gentoo_ctf_soversion = 0.0.0.$(EXTRA_SOVERSION_SUFFIX)
++gentoo_ctf_soversion = "$(BFD_VERSION).$(EXTRA_SOVERSION_SUFFIX)"
+ else
+ gentoo_ctf_soversion = 0.0.0
+ endif
+diff --git a/libctf/Makefile.in b/libctf/Makefile.in
+index b528781af97..18d482411e8 100644
+--- a/libctf/Makefile.in
++++ b/libctf/Makefile.in
+@@ -316,6 +316,7 @@ AUTOCONF = @AUTOCONF@
+ AUTOHEADER = @AUTOHEADER@
+ AUTOMAKE = @AUTOMAKE@
+ AWK = @AWK@
++BFD_VERSION = @BFD_VERSION@
+ CATALOGS = @CATALOGS@
+ CATOBJEXT = @CATOBJEXT@
+ CC = @CC@
+@@ -474,7 +475,7 @@ AM_CFLAGS = -std=gnu99 @ac_libctf_warn_cflags@ @warn@ @c_warn@ @WARN_PEDANTIC@ @
+ 
+ # libctf by default uses libtool versioning. Unfortunately that keeps us from adding
+ # a supplement to the soversion. So we need to switch tracks and be creative.
+-@HAVE_EXTRA_SOVERSION_SUFFIX_TRUE@gentoo_ctf_soversion = 0.0.0.$(EXTRA_SOVERSION_SUFFIX)
++@HAVE_EXTRA_SOVERSION_SUFFIX_TRUE@gentoo_ctf_soversion = "$(BFD_VERSION).$(EXTRA_SOVERSION_SUFFIX)"
+ libctf_nobfd_la_LIBADD = @CTF_LIBADD@ $(ZLIB)
+ libctf_nobfd_la_LDFLAGS = -release $(gentoo_ctf_soversion) @SHARED_LDFLAGS@ @VERSION_FLAGS@
+ libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
+diff --git a/libctf/configure b/libctf/configure
+index e961f637a69..520d3a5cb3e 100755
+--- a/libctf/configure
++++ b/libctf/configure
+@@ -643,6 +643,7 @@ CTF_LIBADD
+ SHARED_LDFLAGS
+ NEED_CTF_QSORT_R_FALSE
+ NEED_CTF_QSORT_R_TRUE
++BFD_VERSION
+ HAVE_EXTRA_SOVERSION_SUFFIX_FALSE
+ HAVE_EXTRA_SOVERSION_SUFFIX_TRUE
+ EXTRA_SOVERSION_SUFFIX
+@@ -11592,7 +11593,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11607 "configure"
++#line 11608 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -11698,7 +11699,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11713 "configure"
++#line 11714 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -12922,6 +12923,9 @@ else
+ fi
+ 
+ 
++BFD_VERSION=$(${srcdir}/../bfd/configure --version | sed -n -e '1s,.* ,,p')
++
++
+ # Similar to GDB_AC_CHECK_BFD.
+ OLD_CFLAGS=$CFLAGS
+ OLD_LDFLAGS=$LDFLAGS
+diff --git a/libctf/configure.ac b/libctf/configure.ac
+index f7e6180afd8..5306e5499ec 100644
+--- a/libctf/configure.ac
++++ b/libctf/configure.ac
+@@ -85,6 +85,8 @@ AC_ARG_WITH(extra-soversion-suffix,
+ AC_SUBST(EXTRA_SOVERSION_SUFFIX)
+ AM_CONDITIONAL([HAVE_EXTRA_SOVERSION_SUFFIX], [test -n "${with_extra_soversion_suffix}"])
+ 
++AC_SUBST(BFD_VERSION, $(${srcdir}/../bfd/configure --version | sed -n -e '1s,.* ,,p'), [Version of the accompanying bfd linker])
++
+ # Similar to GDB_AC_CHECK_BFD.
+ OLD_CFLAGS=$CFLAGS
+ OLD_LDFLAGS=$LDFLAGS
+-- 
+2.31.1
+
