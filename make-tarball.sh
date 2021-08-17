@@ -130,7 +130,7 @@ rm -f 0???-no-patch-*.patch
 rm -f 0???-Automatic-date-update-in-version.in.patch
 
 for myname in 0*.patch ; do
-	mv ${myname} tmp/patch/ || exit 1
+	mv ${myname} tmp/patch/
 done
 
 # add the extra patch
