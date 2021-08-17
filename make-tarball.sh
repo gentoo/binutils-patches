@@ -46,11 +46,14 @@ mydescpatches=$(git describe)
 cd "${mypathbinutils}"
 
 # check that we're on a branch gentoo/${PV}
+# note that we allow for gentoo-specific patch versions, ie.,
+# * the PV 2.37_p1 lives on branch 2.37
+# * the PV 2.37.1  lives on branch 2.37.1
 
 mybranchinfo=$(git status --porcelain -b|grep '^##')
 mybranch=$(echo ${mybranchinfo}|sed -e 's:^## ::' -e 's:\.\.\..*$::')
-if [[ ! "gentoo/binutils-${PV}" == "${mybranch}" ]] ; then
-	echo "Error: Your git repository is on the incorrect branch ${mybranch}; should be gentoo/binutils-${PV}"
+if [[ ! "gentoo/binutils-${PV%_p?}" == "${mybranch}" ]] ; then
+	echo "Error: Your git repository is on the incorrect branch ${mybranch}; should be gentoo/binutils-${PV%_p?}"
 	exit 1
 fi
 
