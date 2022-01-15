@@ -1,7 +1,7 @@
-From 6f9a3d6ffa2bcf91bc047055848591dab77c0f11 Mon Sep 17 00:00:00 2001
+From 66686e75515c742e573d25b74ce324e3d1acad08 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 31 Jul 2021 01:18:18 +0200
-Subject: [PATCH] Gentoo: XFAIL 15 broken ld.gold tests
+Subject: [PATCH 6/6] Gentoo: XFAIL 15 broken ld.gold tests
 
 It seems like either the tests or ld.gold in general cannot handle
 compilers built with --enable-default-pie. No fix yet, so let's ignore
@@ -73,5 +73,5 @@ index 7b4b7832d38..765c2b73140 100644
  AUTOMAKE_OPTIONS = foreign -Wno-portability
  
 -- 
-2.31.1
+2.34.1
 

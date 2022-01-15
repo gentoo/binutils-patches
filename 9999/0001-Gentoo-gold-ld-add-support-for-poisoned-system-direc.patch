@@ -1,7 +1,7 @@
-From 8a82f64de912f26e840b20eec9d8a463fd0e242b Mon Sep 17 00:00:00 2001
+From 322deede0713506f899ee7f284a7c82ba1ec1cf7 Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Tue, 20 Jul 2021 21:08:31 +0200
-Subject: [PATCH 1/6] Gentoo: gold/ld: add support for poisoned system 
+Subject: [PATCH 1/6] Gentoo: gold/ld: add support for poisoned system
  directories
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -43,7 +43,7 @@ Ported to binutils 2.37 Andreas K. Hütte <dilfridge@gentoo.org>
  11 files changed, 146 insertions(+)
 
 diff --git a/gold/options.cc b/gold/options.cc
-index 5a55bd8ba6d..f7940c75f5a 100644
+index 04be98a3e39..64439f8af7a 100644
 --- a/gold/options.cc
 +++ b/gold/options.cc
 @@ -1355,6 +1355,39 @@ General_options::finalize()
@@ -87,7 +87,7 @@ index 5a55bd8ba6d..f7940c75f5a 100644
    if (this->shared() && this->is_static())
      gold_fatal(_("-shared and -static are incompatible"));
 diff --git a/gold/options.h b/gold/options.h
-index 757ebf18fec..490b4cbd7d4 100644
+index 9509a445e8e..a3d76b294cd 100644
 --- a/gold/options.h
 +++ b/gold/options.h
 @@ -1394,6 +1394,13 @@ class General_options
@@ -119,10 +119,10 @@ index 26d55a00d47..ffad464783c 100644
  #undef EXTRA_SHLIB_EXTENSION
  
 diff --git a/ld/configure b/ld/configure
-index c197aaef3cb..882263aa43f 100755
+index f5c329c1f12..41ec6ca73ac 100755
 --- a/ld/configure
 +++ b/ld/configure
-@@ -829,6 +829,7 @@ with_lib_path
+@@ -831,6 +831,7 @@ with_lib_path
  enable_targets
  enable_64_bit_bfd
  with_sysroot
@@ -130,7 +130,7 @@ index c197aaef3cb..882263aa43f 100755
  enable_gold
  enable_got
  enable_compressed_debug_sections
-@@ -1498,6 +1499,8 @@ Optional Features:
+@@ -1500,6 +1501,8 @@ Optional Features:
    --enable-checking       enable run-time checks
    --enable-targets        alternative target configurations
    --enable-64-bit-bfd     64-bit support (on hosts with narrower word sizes)
@@ -139,7 +139,7 @@ index c197aaef3cb..882263aa43f 100755
    --enable-gold[=ARG]     build gold [ARG={default,yes,no}]
    --enable-got=<type>     GOT handling scheme (target, single, negative,
                            multigot)
-@@ -15236,7 +15239,18 @@ else
+@@ -15333,7 +15336,18 @@ else
  fi
  
  
@@ -159,10 +159,10 @@ index c197aaef3cb..882263aa43f 100755
  # Check whether --enable-got was given.
  if test "${enable_got+set}" = set; then :
 diff --git a/ld/configure.ac b/ld/configure.ac
-index 8ea97c43cd4..0f246db67d8 100644
+index 7f4cff079b7..57d1abff870 100644
 --- a/ld/configure.ac
 +++ b/ld/configure.ac
-@@ -106,6 +106,16 @@ AC_SUBST(use_sysroot)
+@@ -102,6 +102,16 @@ AC_SUBST(use_sysroot)
  AC_SUBST(TARGET_SYSTEM_ROOT)
  AC_SUBST(TARGET_SYSTEM_ROOT_DEFINE)
  
@@ -180,7 +180,7 @@ index 8ea97c43cd4..0f246db67d8 100644
  dnl "install_as_default" is set to false if gold is the default linker.
  dnl "installed_linker" is the installed BFD linker name.
 diff --git a/ld/ld.h b/ld/ld.h
-index 35fafebfaed..4152278b8f4 100644
+index f3086bf30de..90cf1ca51e5 100644
 --- a/ld/ld.h
 +++ b/ld/ld.h
 @@ -162,6 +162,13 @@ typedef struct
@@ -198,10 +198,10 @@ index 35fafebfaed..4152278b8f4 100644
    enum endian_enum endian;
  
 diff --git a/ld/ld.texi b/ld/ld.texi
-index dd8f571d4e4..0aee4a4e9f1 100644
+index fc75e9b3625..f7d46117bab 100644
 --- a/ld/ld.texi
 +++ b/ld/ld.texi
-@@ -2863,6 +2863,24 @@ string identifying the original linked file does not change.
+@@ -2892,6 +2892,24 @@ string identifying the original linked file does not change.
  
  Passing @code{none} for @var{style} disables the setting from any
  @code{--build-id} options earlier on the command line.
@@ -227,7 +227,7 @@ index dd8f571d4e4..0aee4a4e9f1 100644
  
  @c man end
 diff --git a/ld/ldfile.c b/ld/ldfile.c
-index 9d0af06f1f6..f4a83acca93 100644
+index 731ae5f7aed..6b67e29041b 100644
 --- a/ld/ldfile.c
 +++ b/ld/ldfile.c
 @@ -117,6 +117,26 @@ ldfile_add_library_path (const char *name, bool cmdline)
@@ -258,10 +258,10 @@ index 9d0af06f1f6..f4a83acca93 100644
  
  /* Try to open a BFD for a lang_input_statement.  */
 diff --git a/ld/ldlex.h b/ld/ldlex.h
-index 9e8bf5fb835..3baed822a22 100644
+index bc58fea73cc..cf1b015a420 100644
 --- a/ld/ldlex.h
 +++ b/ld/ldlex.h
-@@ -148,6 +148,9 @@ enum option_values
+@@ -149,6 +149,9 @@ enum option_values
    OPTION_PRINT_OUTPUT_FORMAT,
    OPTION_PRINT_SYSROOT,
    OPTION_IGNORE_UNRESOLVED_SYMBOL,
@@ -272,7 +272,7 @@ index 9e8bf5fb835..3baed822a22 100644
    OPTION_POP_STATE,
    OPTION_DISABLE_MULTIPLE_DEFS_ABS,
 diff --git a/ld/ldmain.c b/ld/ldmain.c
-index 42660eb9a3c..c78009b760c 100644
+index ea72b14a301..706ec9ce26e 100644
 --- a/ld/ldmain.c
 +++ b/ld/ldmain.c
 @@ -321,6 +321,13 @@ main (int argc, char **argv)
@@ -290,10 +290,10 @@ index 42660eb9a3c..c78009b760c 100644
    /* We initialize DEMANGLING based on the environment variable
       COLLECT_NO_DEMANGLE.  The gcc collect2 program will demangle the
 diff --git a/ld/lexsup.c b/ld/lexsup.c
-index 00274c500d0..a19cce9967c 100644
+index 5acc47ed5a0..e78df2daf29 100644
 --- a/ld/lexsup.c
 +++ b/ld/lexsup.c
-@@ -566,6 +566,18 @@ static const struct ld_option ld_options[] =
+@@ -571,6 +571,18 @@ static const struct ld_option ld_options[] =
      OPTION_IGNORE_UNRESOLVED_SYMBOL},
      '\0', N_("SYMBOL"),
      N_("Unresolved SYMBOL will not cause an error or warning"), TWO_DASHES },
@@ -312,7 +312,7 @@ index 00274c500d0..a19cce9967c 100644
    { {"push-state", no_argument, NULL, OPTION_PUSH_STATE},
      '\0', NULL, N_("Push state of flags governing input file handling"),
      TWO_DASHES },
-@@ -1643,6 +1655,18 @@ parse_args (unsigned argc, char **argv)
+@@ -1659,6 +1671,18 @@ parse_args (unsigned argc, char **argv)
  	  }
  	  break;
  
@@ -332,5 +332,5 @@ index 00274c500d0..a19cce9967c 100644
  	  input_flags.pushed = xmemdup (&input_flags,
  					sizeof (input_flags),
 -- 
-2.31.1
+2.34.1
 

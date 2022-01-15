@@ -1,7 +1,7 @@
-From 905bf3c180f4f7fd07024eb9ff7851898593f3f8 Mon Sep 17 00:00:00 2001
+From 6e5bb8fa8e5f409e12098a922de72f6bdcc99603 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Tue, 20 Jul 2021 21:15:24 +0200
-Subject: [PATCH 6/6] Gentoo: Pass --hash-style=sysv to ld in the testsuite
+Subject: [PATCH 4/6] Gentoo: Pass --hash-style=sysv to ld in the testsuite
 
 ---
  binutils/testsuite/lib/binutils-common.exp |  2 +-
@@ -9,10 +9,10 @@ Subject: [PATCH 6/6] Gentoo: Pass --hash-style=sysv to ld in the testsuite
  2 files changed, 15 insertions(+), 3 deletions(-)
 
 diff --git a/binutils/testsuite/lib/binutils-common.exp b/binutils/testsuite/lib/binutils-common.exp
-index 59e25df99b0..401a05b5c32 100644
+index 93603b0be68..83ae1307f2a 100644
 --- a/binutils/testsuite/lib/binutils-common.exp
 +++ b/binutils/testsuite/lib/binutils-common.exp
-@@ -1279,7 +1279,7 @@ proc run_dump_test { name {extra_options {}} } {
+@@ -1303,7 +1303,7 @@ proc run_dump_test { name {extra_options {}} } {
  
  	    # Add -L$srcdir/$subdir so that the linker command can use
  	    # linker scripts in the source directory.
@@ -22,10 +22,10 @@ index 59e25df99b0..401a05b5c32 100644
  
  	    # If needed then check for, or add a -Map option.
 diff --git a/ld/testsuite/lib/ld-lib.exp b/ld/testsuite/lib/ld-lib.exp
-index 8fd14afc63e..adbeaa3bd08 100644
+index 5c7771f7221..ff9ee6a425c 100644
 --- a/ld/testsuite/lib/ld-lib.exp
 +++ b/ld/testsuite/lib/ld-lib.exp
-@@ -167,7 +167,7 @@ proc default_ld_relocate { ld target objects } {
+@@ -171,7 +171,7 @@ proc default_ld_relocate { ld target objects } {
      global HOSTING_EMU
  
      remote_file host delete $target
@@ -34,7 +34,7 @@ index 8fd14afc63e..adbeaa3bd08 100644
  }
  
  # Check to see if ld is being invoked with a non-endian output format
-@@ -198,8 +198,20 @@ proc default_ld_link { ld target objects } {
+@@ -202,8 +202,20 @@ proc default_ld_link { ld target objects } {
  	set flags [big_or_little_endian]
      }
  
@@ -57,5 +57,5 @@ index 8fd14afc63e..adbeaa3bd08 100644
  
      # We don't care if we get a warning about a non-existent start
 -- 
-2.31.1
+2.34.1
 

@@ -1,29 +1,31 @@
-From d3cd41f5c7e405a8db5e85a7be9dfc42d44ef1b8 Mon Sep 17 00:00:00 2001
+From f4db43e58d2f3a6e66b15ff2b25ac6850199399b Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 24 Jul 2021 15:20:16 +0200
-Subject: [PATCH 1/2] Give also libctf optionally a gentoo-specific soversion
+Subject: [PATCH 5/6] Gentoo: Give also libctf optionally a gentoo-specific
+ soversion
 
 ---
- libctf/Makefile.am  | 13 ++++++++++++-
- libctf/Makefile.in  |  8 +++++++-
- libctf/configure    | 31 +++++++++++++++++++++++++++++--
- libctf/configure.ac |  8 ++++++++
- 4 files changed, 56 insertions(+), 4 deletions(-)
+ libctf/Makefile.am  | 14 +++++++++++++-
+ libctf/Makefile.in  |  9 ++++++++-
+ libctf/configure    | 35 +++++++++++++++++++++++++++++++++--
+ libctf/configure.ac | 10 ++++++++++
+ 4 files changed, 64 insertions(+), 4 deletions(-)
 
 diff --git a/libctf/Makefile.am b/libctf/Makefile.am
-index e586d25fb37..eabc7fa8394 100644
+index 27e90f0ba36..4990a20efa3 100644
 --- a/libctf/Makefile.am
 +++ b/libctf/Makefile.am
-@@ -21,6 +21,8 @@ ACLOCAL_AMFLAGS = -I .. -I ../config -I ../bfd
- 
- AUTOMAKE_OPTIONS = dejagnu foreign no-texinfo.tex
+@@ -26,6 +26,9 @@ info_TEXINFOS =
+ DISTCLEANFILES =
+ MAINTAINERCLEANFILES =
  
 +EXTRA_SOVERSION_SUFFIX = @EXTRA_SOVERSION_SUFFIX@
++BFD_VERSION = @BFD_VERSION@
 +
  # This is where we get zlib from.  zlibdir is -L../zlib and zlibinc is
  # -I../zlib, unless we were configured with --with-system-zlib, in which
  # case both are empty.
-@@ -41,8 +43,17 @@ include_HEADERS =
+@@ -46,8 +49,17 @@ include_HEADERS =
  noinst_LTLIBRARIES = libctf.la libctf-nobfd.la
  endif
  
@@ -31,22 +33,30 @@ index e586d25fb37..eabc7fa8394 100644
 +# a supplement to the soversion. So we need to switch tracks and be creative.
 +
 +if HAVE_EXTRA_SOVERSION_SUFFIX
-+gentoo_ctf_soversion = 0.0.0.$(EXTRA_SOVERSION_SUFFIX)
++gentoo_ctf_soversion = "$(BFD_VERSION).$(EXTRA_SOVERSION_SUFFIX)"
 +else
 +gentoo_ctf_soversion = 0.0.0
 +endif
 +
  libctf_nobfd_la_LIBADD = @CTF_LIBADD@ $(ZLIB)
--libctf_nobfd_la_LDFLAGS = -version-info 0:0:0 @SHARED_LDFLAGS@ @VERSION_FLAGS@
-+libctf_nobfd_la_LDFLAGS = -release $(gentoo_ctf_soversion) @SHARED_LDFLAGS@ @VERSION_FLAGS@
+-libctf_ldflags_nover = -version-info 0:0:0 @SHARED_LDFLAGS@
++libctf_ldflags_nover = -release $(gentoo_ctf_soversion) @SHARED_LDFLAGS@
+ libctf_nobfd_la_LDFLAGS = $(libctf_ldflags_nover) @VERSION_FLAGS_NOBFD@
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c ctf-decl.c ctf-error.c \
- 			  ctf-hash.c ctf-labels.c ctf-dedup.c ctf-link.c ctf-lookup.c \
 diff --git a/libctf/Makefile.in b/libctf/Makefile.in
-index 5cfa100f9cc..b528781af97 100644
+index 3b5ab73324e..10029107a05 100644
 --- a/libctf/Makefile.in
 +++ b/libctf/Makefile.in
-@@ -338,6 +338,7 @@ EXEEXT = @EXEEXT@
+@@ -381,6 +381,7 @@ AUTOCONF = @AUTOCONF@
+ AUTOHEADER = @AUTOHEADER@
+ AUTOMAKE = @AUTOMAKE@
+ AWK = @AWK@
++BFD_VERSION = @BFD_VERSION@
+ CATALOGS = @CATALOGS@
+ CATOBJEXT = @CATOBJEXT@
+ CC = @CC@
+@@ -403,6 +404,7 @@ EXEEXT = @EXEEXT@
  
  # Setup the testing framework, if you have one
  EXPECT = expect
@@ -54,7 +64,7 @@ index 5cfa100f9cc..b528781af97 100644
  FGREP = @FGREP@
  GENCAT = @GENCAT@
  GMSGFMT = @GMSGFMT@
-@@ -469,8 +470,13 @@ AM_CFLAGS = -std=gnu99 @ac_libctf_warn_cflags@ @warn@ @c_warn@ @WARN_PEDANTIC@ @
+@@ -540,8 +542,13 @@ AM_CFLAGS = -std=gnu99 @ac_libctf_warn_cflags@ @warn@ @c_warn@ @WARN_PEDANTIC@ @
  @INSTALL_LIBBFD_FALSE@include_HEADERS = 
  @INSTALL_LIBBFD_TRUE@include_HEADERS = $(INCDIR)/ctf.h $(INCDIR)/ctf-api.h
  @INSTALL_LIBBFD_FALSE@noinst_LTLIBRARIES = libctf.la libctf-nobfd.la
@@ -62,28 +72,29 @@ index 5cfa100f9cc..b528781af97 100644
 +
 +# libctf by default uses libtool versioning. Unfortunately that keeps us from adding
 +# a supplement to the soversion. So we need to switch tracks and be creative.
-+@HAVE_EXTRA_SOVERSION_SUFFIX_TRUE@gentoo_ctf_soversion = 0.0.0.$(EXTRA_SOVERSION_SUFFIX)
++@HAVE_EXTRA_SOVERSION_SUFFIX_TRUE@gentoo_ctf_soversion = "$(BFD_VERSION).$(EXTRA_SOVERSION_SUFFIX)"
  libctf_nobfd_la_LIBADD = @CTF_LIBADD@ $(ZLIB)
--libctf_nobfd_la_LDFLAGS = -version-info 0:0:0 @SHARED_LDFLAGS@ @VERSION_FLAGS@
-+libctf_nobfd_la_LDFLAGS = -release $(gentoo_ctf_soversion) @SHARED_LDFLAGS@ @VERSION_FLAGS@
+-libctf_ldflags_nover = -version-info 0:0:0 @SHARED_LDFLAGS@
++libctf_ldflags_nover = -release $(gentoo_ctf_soversion) @SHARED_LDFLAGS@
+ libctf_nobfd_la_LDFLAGS = $(libctf_ldflags_nover) @VERSION_FLAGS_NOBFD@
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c \
- 	ctf-decl.c ctf-error.c ctf-hash.c ctf-labels.c ctf-dedup.c \
 diff --git a/libctf/configure b/libctf/configure
-index 82bcf13a606..e961f637a69 100755
+index c56ac218213..623e71477b3 100755
 --- a/libctf/configure
 +++ b/libctf/configure
-@@ -643,6 +643,9 @@ CTF_LIBADD
- SHARED_LDFLAGS
+@@ -646,6 +646,10 @@ BUILD_INFO_FALSE
+ BUILD_INFO_TRUE
  NEED_CTF_QSORT_R_FALSE
  NEED_CTF_QSORT_R_TRUE
++BFD_VERSION
 +HAVE_EXTRA_SOVERSION_SUFFIX_FALSE
 +HAVE_EXTRA_SOVERSION_SUFFIX_TRUE
 +EXTRA_SOVERSION_SUFFIX
  ENABLE_LIBCTF_HASH_DEBUGGING_FALSE
  ENABLE_LIBCTF_HASH_DEBUGGING_TRUE
  zlibinc
-@@ -804,6 +807,7 @@ enable_maintainer_mode
+@@ -807,6 +811,7 @@ enable_maintainer_mode
  enable_install_libbfd
  with_system_zlib
  enable_libctf_hash_debugging
@@ -91,7 +102,7 @@ index 82bcf13a606..e961f637a69 100755
  '
        ac_precious_vars='build_alias
  host_alias
-@@ -1461,6 +1465,8 @@ Optional Packages:
+@@ -1464,6 +1469,8 @@ Optional Packages:
                            both]
    --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
    --with-system-zlib      use installed libz
@@ -100,25 +111,25 @@ index 82bcf13a606..e961f637a69 100755
  
  Some influential environment variables:
    CC          C compiler command
-@@ -11586,7 +11592,7 @@ else
+@@ -11629,7 +11636,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 11589 "configure"
-+#line 11607 "configure"
+-#line 11632 "configure"
++#line 11639 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -11692,7 +11698,7 @@ else
+@@ -11735,7 +11742,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 11695 "configure"
-+#line 11713 "configure"
+-#line 11738 "configure"
++#line 11745 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -12899,6 +12905,23 @@ else
+@@ -12942,6 +12949,26 @@ else
  fi
  
  
@@ -139,10 +150,13 @@ index 82bcf13a606..e961f637a69 100755
 +fi
 +
 +
++BFD_VERSION=$(${srcdir}/../bfd/configure --version | sed -n -e '1s,.* ,,p')
++
++
  # Similar to GDB_AC_CHECK_BFD.
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
-@@ -13657,6 +13680,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
+@@ -13834,6 +13861,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
    as_fn_error $? "conditional \"ENABLE_LIBCTF_HASH_DEBUGGING\" was never defined.
  Usually this means the macro was only invoked conditionally." "$LINENO" 5
  fi
@@ -154,10 +168,10 @@ index 82bcf13a606..e961f637a69 100755
  if test -z "${NEED_CTF_QSORT_R_TRUE}" && test -z "${NEED_CTF_QSORT_R_FALSE}"; then
    as_fn_error $? "conditional \"NEED_CTF_QSORT_R\" was never defined.
 diff --git a/libctf/configure.ac b/libctf/configure.ac
-index 80644b89d67..f7e6180afd8 100644
+index 4996edd5b70..103fc8b9d33 100644
 --- a/libctf/configure.ac
 +++ b/libctf/configure.ac
-@@ -77,6 +77,14 @@ if test "${enable_libctf_hash_debugging}" = yes; then
+@@ -78,6 +78,16 @@ if test "${enable_libctf_hash_debugging}" = yes; then
  fi
  AM_CONDITIONAL(ENABLE_LIBCTF_HASH_DEBUGGING, test "${enable_libctf_hash_debugging}" = yes)
  
@@ -169,9 +183,11 @@ index 80644b89d67..f7e6180afd8 100644
 +AC_SUBST(EXTRA_SOVERSION_SUFFIX)
 +AM_CONDITIONAL([HAVE_EXTRA_SOVERSION_SUFFIX], [test -n "${with_extra_soversion_suffix}"])
 +
++AC_SUBST(BFD_VERSION, $(${srcdir}/../bfd/configure --version | sed -n -e '1s,.* ,,p'), [Version of the accompanying bfd linker])
++
  # Similar to GDB_AC_CHECK_BFD.
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
 -- 
-2.31.1
+2.34.1
 
