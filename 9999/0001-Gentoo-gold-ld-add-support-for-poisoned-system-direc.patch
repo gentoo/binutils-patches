@@ -1,4 +1,4 @@
-From 322deede0713506f899ee7f284a7c82ba1ec1cf7 Mon Sep 17 00:00:00 2001
+From 6ad35e463cbd086b4d4e7bb5aca1da6b73e614c8 Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Tue, 20 Jul 2021 21:08:31 +0200
 Subject: [PATCH 1/6] Gentoo: gold/ld: add support for poisoned system
@@ -27,12 +27,13 @@ TEST=x86_64-cros-linux-gnu-ld throws warnings when using -L/lib (gold & bfd)
 Reviewed-on: https://chromium-review.googlesource.com/272083
 (cherry picked from commit f92dbf35c00ab13cee36f6be8ae5ca46454d9000)
 
-Ported to binutils 2.37 Andreas K. Hütte <dilfridge@gentoo.org>
+Ported to binutils 2.37 by Andreas K. Hüttel <dilfridge@gentoo.org>
+Ported to binutils 2.39 by WANG Xuerui <xen0n@gentoo.org>
 ---
  gold/options.cc | 33 +++++++++++++++++++++++++++++++++
  gold/options.h  |  7 +++++++
  ld/config.in    |  3 +++
- ld/configure    | 14 ++++++++++++++
+ ld/configure    | 20 ++++++++++++++++++--
  ld/configure.ac | 10 ++++++++++
  ld/ld.h         |  7 +++++++
  ld/ld.texi      | 18 ++++++++++++++++++
@@ -40,7 +41,7 @@ Ported to binutils 2.37 Andreas K. Hütte <dilfridge@gentoo.org>
  ld/ldlex.h      |  3 +++
  ld/ldmain.c     |  7 +++++++
  ld/lexsup.c     | 24 ++++++++++++++++++++++++
- 11 files changed, 146 insertions(+)
+ 11 files changed, 150 insertions(+), 2 deletions(-)
 
 diff --git a/gold/options.cc b/gold/options.cc
 index 04be98a3e39..64439f8af7a 100644
@@ -105,10 +106,10 @@ index 9509a445e8e..a3d76b294cd 100644
  	      N_("Warn when skipping an incompatible library"),
  	      N_("Don't warn when skipping an incompatible library"));
 diff --git a/ld/config.in b/ld/config.in
-index 26d55a00d47..ffad464783c 100644
+index 0ccd79d59cd..5e39814bce0 100644
 --- a/ld/config.in
 +++ b/ld/config.in
-@@ -43,6 +43,9 @@
+@@ -55,6 +55,9 @@
     language is requested. */
  #undef ENABLE_NLS
  
@@ -119,10 +120,10 @@ index 26d55a00d47..ffad464783c 100644
  #undef EXTRA_SHLIB_EXTENSION
  
 diff --git a/ld/configure b/ld/configure
-index f5c329c1f12..41ec6ca73ac 100755
+index 1c2b64870b1..46b5789c77e 100755
 --- a/ld/configure
 +++ b/ld/configure
-@@ -831,6 +831,7 @@ with_lib_path
+@@ -836,6 +836,7 @@ with_lib_path
  enable_targets
  enable_64_bit_bfd
  with_sysroot
@@ -130,7 +131,7 @@ index f5c329c1f12..41ec6ca73ac 100755
  enable_gold
  enable_got
  enable_compressed_debug_sections
-@@ -1500,6 +1501,8 @@ Optional Features:
+@@ -1514,6 +1515,8 @@ Optional Features:
    --enable-checking       enable run-time checks
    --enable-targets        alternative target configurations
    --enable-64-bit-bfd     64-bit support (on hosts with narrower word sizes)
@@ -139,8 +140,26 @@ index f5c329c1f12..41ec6ca73ac 100755
    --enable-gold[=ARG]     build gold [ARG={default,yes,no}]
    --enable-got=<type>     GOT handling scheme (target, single, negative,
                            multigot)
-@@ -15333,7 +15336,18 @@ else
- fi
+@@ -11491,7 +11494,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11494 "configure"
++#line 11497 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -11597,7 +11600,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11600 "configure"
++#line 11603 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -15349,6 +15352,19 @@ fi
+ 
  
  
 +# Check whether --enable-poison-system-directories was given.
@@ -151,15 +170,16 @@ index f5c329c1f12..41ec6ca73ac 100755
 +fi
 +
 +if test "x${enable_poison_system_directories}" = "xyes"; then
- 
++
 +$as_echo "#define ENABLE_POISON_SYSTEM_DIRECTORIES 1" >>confdefs.h
 +
 +fi
- 
- # Check whether --enable-got was given.
- if test "${enable_got+set}" = set; then :
++
+ # Check whether --enable-gold was given.
+ if test "${enable_gold+set}" = set; then :
+   enableval=$enable_gold; case "${enableval}" in
 diff --git a/ld/configure.ac b/ld/configure.ac
-index 7f4cff079b7..57d1abff870 100644
+index eb55904c090..0844c2364c5 100644
 --- a/ld/configure.ac
 +++ b/ld/configure.ac
 @@ -102,6 +102,16 @@ AC_SUBST(use_sysroot)
@@ -198,13 +218,13 @@ index f3086bf30de..90cf1ca51e5 100644
    enum endian_enum endian;
  
 diff --git a/ld/ld.texi b/ld/ld.texi
-index fc75e9b3625..f7d46117bab 100644
+index eabbec8faa9..45f4858526c 100644
 --- a/ld/ld.texi
 +++ b/ld/ld.texi
-@@ -2892,6 +2892,24 @@ string identifying the original linked file does not change.
- 
- Passing @code{none} for @var{style} disables the setting from any
- @code{--build-id} options earlier on the command line.
+@@ -2947,6 +2947,24 @@ creation of the metadata note, if one had been enabled by an earlier
+ occurrence of the --package-metdata option.
+ If the linker has been built with libjansson, then the JSON string
+ will be validated.
 +
 +@kindex --warn-poison-system-directories
 +@item --warn-poison-system-directories
@@ -258,7 +278,7 @@ index 731ae5f7aed..6b67e29041b 100644
  
  /* Try to open a BFD for a lang_input_statement.  */
 diff --git a/ld/ldlex.h b/ld/ldlex.h
-index bc58fea73cc..cf1b015a420 100644
+index 57ade1f754b..b35a6122e09 100644
 --- a/ld/ldlex.h
 +++ b/ld/ldlex.h
 @@ -149,6 +149,9 @@ enum option_values
@@ -290,10 +310,10 @@ index ea72b14a301..706ec9ce26e 100644
    /* We initialize DEMANGLING based on the environment variable
       COLLECT_NO_DEMANGLE.  The gcc collect2 program will demangle the
 diff --git a/ld/lexsup.c b/ld/lexsup.c
-index 5acc47ed5a0..e78df2daf29 100644
+index 9225f71b3ce..db5b170bc7c 100644
 --- a/ld/lexsup.c
 +++ b/ld/lexsup.c
-@@ -571,6 +571,18 @@ static const struct ld_option ld_options[] =
+@@ -579,6 +579,18 @@ static const struct ld_option ld_options[] =
      OPTION_IGNORE_UNRESOLVED_SYMBOL},
      '\0', N_("SYMBOL"),
      N_("Unresolved SYMBOL will not cause an error or warning"), TWO_DASHES },
@@ -312,7 +332,7 @@ index 5acc47ed5a0..e78df2daf29 100644
    { {"push-state", no_argument, NULL, OPTION_PUSH_STATE},
      '\0', NULL, N_("Push state of flags governing input file handling"),
      TWO_DASHES },
-@@ -1659,6 +1671,18 @@ parse_args (unsigned argc, char **argv)
+@@ -1679,6 +1691,18 @@ parse_args (unsigned argc, char **argv)
  	  }
  	  break;
  
@@ -332,5 +352,5 @@ index 5acc47ed5a0..e78df2daf29 100644
  	  input_flags.pushed = xmemdup (&input_flags,
  					sizeof (input_flags),
 -- 
-2.34.1
+2.35.1
 

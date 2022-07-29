@@ -1,4 +1,4 @@
-From 6e5bb8fa8e5f409e12098a922de72f6bdcc99603 Mon Sep 17 00:00:00 2001
+From 19d0d0a3fca319b6a14888ce709a75d9b0765561 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Tue, 20 Jul 2021 21:15:24 +0200
 Subject: [PATCH 4/6] Gentoo: Pass --hash-style=sysv to ld in the testsuite
@@ -9,10 +9,10 @@ Subject: [PATCH 4/6] Gentoo: Pass --hash-style=sysv to ld in the testsuite
  2 files changed, 15 insertions(+), 3 deletions(-)
 
 diff --git a/binutils/testsuite/lib/binutils-common.exp b/binutils/testsuite/lib/binutils-common.exp
-index 93603b0be68..83ae1307f2a 100644
+index ccc33a827b4..f7aecf7edc2 100644
 --- a/binutils/testsuite/lib/binutils-common.exp
 +++ b/binutils/testsuite/lib/binutils-common.exp
-@@ -1303,7 +1303,7 @@ proc run_dump_test { name {extra_options {}} } {
+@@ -1310,7 +1310,7 @@ proc run_dump_test { name {extra_options {}} } {
  
  	    # Add -L$srcdir/$subdir so that the linker command can use
  	    # linker scripts in the source directory.
@@ -22,7 +22,7 @@ index 93603b0be68..83ae1307f2a 100644
  
  	    # If needed then check for, or add a -Map option.
 diff --git a/ld/testsuite/lib/ld-lib.exp b/ld/testsuite/lib/ld-lib.exp
-index 5c7771f7221..ff9ee6a425c 100644
+index ec27388a72e..fc7292a40a7 100644
 --- a/ld/testsuite/lib/ld-lib.exp
 +++ b/ld/testsuite/lib/ld-lib.exp
 @@ -171,7 +171,7 @@ proc default_ld_relocate { ld target objects } {
@@ -57,5 +57,5 @@ index 5c7771f7221..ff9ee6a425c 100644
  
      # We don't care if we get a warning about a non-existent start
 -- 
-2.34.1
+2.35.1
 
