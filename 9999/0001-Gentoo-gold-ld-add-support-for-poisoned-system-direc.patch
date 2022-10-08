@@ -1,4 +1,4 @@
-From 6ad35e463cbd086b4d4e7bb5aca1da6b73e614c8 Mon Sep 17 00:00:00 2001
+From eaf58344eafc9b9943a0bd7e9e00130965b10274 Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Tue, 20 Jul 2021 21:08:31 +0200
 Subject: [PATCH 1/6] Gentoo: gold/ld: add support for poisoned system
@@ -88,10 +88,10 @@ index 04be98a3e39..64439f8af7a 100644
    if (this->shared() && this->is_static())
      gold_fatal(_("-shared and -static are incompatible"));
 diff --git a/gold/options.h b/gold/options.h
-index 9509a445e8e..a3d76b294cd 100644
+index 17236eb9cb9..dad649870bf 100644
 --- a/gold/options.h
 +++ b/gold/options.h
-@@ -1394,6 +1394,13 @@ class General_options
+@@ -1398,6 +1398,13 @@ class General_options
    DEFINE_bool(warn_multiple_gp, options::TWO_DASHES, '\0', false,
  	      N_("Ignored"), NULL);
  
@@ -106,7 +106,7 @@ index 9509a445e8e..a3d76b294cd 100644
  	      N_("Warn when skipping an incompatible library"),
  	      N_("Don't warn when skipping an incompatible library"));
 diff --git a/ld/config.in b/ld/config.in
-index 0ccd79d59cd..5e39814bce0 100644
+index 3916740eee4..7e70b0179ea 100644
 --- a/ld/config.in
 +++ b/ld/config.in
 @@ -55,6 +55,9 @@
@@ -120,10 +120,10 @@ index 0ccd79d59cd..5e39814bce0 100644
  #undef EXTRA_SHLIB_EXTENSION
  
 diff --git a/ld/configure b/ld/configure
-index 1c2b64870b1..46b5789c77e 100755
+index 9dd3ed5f1e7..a9a67a8babe 100755
 --- a/ld/configure
 +++ b/ld/configure
-@@ -836,6 +836,7 @@ with_lib_path
+@@ -838,6 +838,7 @@ with_lib_path
  enable_targets
  enable_64_bit_bfd
  with_sysroot
@@ -131,7 +131,7 @@ index 1c2b64870b1..46b5789c77e 100755
  enable_gold
  enable_got
  enable_compressed_debug_sections
-@@ -1514,6 +1515,8 @@ Optional Features:
+@@ -1519,6 +1520,8 @@ Optional Features:
    --enable-checking       enable run-time checks
    --enable-targets        alternative target configurations
    --enable-64-bit-bfd     64-bit support (on hosts with narrower word sizes)
@@ -140,25 +140,25 @@ index 1c2b64870b1..46b5789c77e 100755
    --enable-gold[=ARG]     build gold [ARG={default,yes,no}]
    --enable-got=<type>     GOT handling scheme (target, single, negative,
                            multigot)
-@@ -11491,7 +11494,7 @@ else
+@@ -11620,7 +11623,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 11494 "configure"
-+#line 11497 "configure"
+-#line 11623 "configure"
++#line 11626 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -11597,7 +11600,7 @@ else
+@@ -11726,7 +11729,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 11600 "configure"
-+#line 11603 "configure"
+-#line 11729 "configure"
++#line 11732 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -15349,6 +15352,19 @@ fi
+@@ -15478,6 +15481,19 @@ fi
  
  
  
@@ -179,10 +179,10 @@ index 1c2b64870b1..46b5789c77e 100755
  if test "${enable_gold+set}" = set; then :
    enableval=$enable_gold; case "${enableval}" in
 diff --git a/ld/configure.ac b/ld/configure.ac
-index eb55904c090..0844c2364c5 100644
+index f1b2f9897f8..1927d79e728 100644
 --- a/ld/configure.ac
 +++ b/ld/configure.ac
-@@ -102,6 +102,16 @@ AC_SUBST(use_sysroot)
+@@ -103,6 +103,16 @@ AC_SUBST(use_sysroot)
  AC_SUBST(TARGET_SYSTEM_ROOT)
  AC_SUBST(TARGET_SYSTEM_ROOT_DEFINE)
  
@@ -218,10 +218,10 @@ index f3086bf30de..90cf1ca51e5 100644
    enum endian_enum endian;
  
 diff --git a/ld/ld.texi b/ld/ld.texi
-index eabbec8faa9..45f4858526c 100644
+index 9daed2e7e9f..d76b534a456 100644
 --- a/ld/ld.texi
 +++ b/ld/ld.texi
-@@ -2947,6 +2947,24 @@ creation of the metadata note, if one had been enabled by an earlier
+@@ -2952,6 +2952,24 @@ creation of the metadata note, if one had been enabled by an earlier
  occurrence of the --package-metdata option.
  If the linker has been built with libjansson, then the JSON string
  will be validated.
@@ -292,7 +292,7 @@ index 57ade1f754b..b35a6122e09 100644
    OPTION_POP_STATE,
    OPTION_DISABLE_MULTIPLE_DEFS_ABS,
 diff --git a/ld/ldmain.c b/ld/ldmain.c
-index ea72b14a301..706ec9ce26e 100644
+index d63002c994a..55364ef5773 100644
 --- a/ld/ldmain.c
 +++ b/ld/ldmain.c
 @@ -321,6 +321,13 @@ main (int argc, char **argv)
@@ -310,7 +310,7 @@ index ea72b14a301..706ec9ce26e 100644
    /* We initialize DEMANGLING based on the environment variable
       COLLECT_NO_DEMANGLE.  The gcc collect2 program will demangle the
 diff --git a/ld/lexsup.c b/ld/lexsup.c
-index 9225f71b3ce..db5b170bc7c 100644
+index 299371fb775..02816ebb1b6 100644
 --- a/ld/lexsup.c
 +++ b/ld/lexsup.c
 @@ -579,6 +579,18 @@ static const struct ld_option ld_options[] =
@@ -352,5 +352,5 @@ index 9225f71b3ce..db5b170bc7c 100644
  	  input_flags.pushed = xmemdup (&input_flags,
  					sizeof (input_flags),
 -- 
-2.35.1
+2.38.0
 

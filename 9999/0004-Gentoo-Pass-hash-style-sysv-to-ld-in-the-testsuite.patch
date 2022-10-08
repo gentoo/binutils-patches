@@ -1,4 +1,4 @@
-From 19d0d0a3fca319b6a14888ce709a75d9b0765561 Mon Sep 17 00:00:00 2001
+From eeb95d2a0cda143dad4d905429ced8a339c486e3 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Tue, 20 Jul 2021 21:15:24 +0200
 Subject: [PATCH 4/6] Gentoo: Pass --hash-style=sysv to ld in the testsuite
@@ -57,5 +57,5 @@ index ec27388a72e..fc7292a40a7 100644
  
      # We don't care if we get a warning about a non-existent start
 -- 
-2.35.1
+2.38.0
 
