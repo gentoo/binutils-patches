@@ -1,4 +1,4 @@
-From ee4de1adb09cbfcad39e544e2f05392b210b550a Mon Sep 17 00:00:00 2001
+From ffb569acc3bfa5a22cc6581338108f79fd3d8c55 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 24 Jul 2021 15:20:16 +0200
 Subject: [PATCH 5/6] Gentoo: Give also libctf optionally a gentoo-specific
@@ -12,7 +12,7 @@ Subject: [PATCH 5/6] Gentoo: Give also libctf optionally a gentoo-specific
  4 files changed, 64 insertions(+), 4 deletions(-)
 
 diff --git a/libctf/Makefile.am b/libctf/Makefile.am
-index 27e90f0ba36..4990a20efa3 100644
+index c4809f70bae..5571eef8aa1 100644
 --- a/libctf/Makefile.am
 +++ b/libctf/Makefile.am
 @@ -26,6 +26,9 @@ info_TEXINFOS =
@@ -45,10 +45,10 @@ index 27e90f0ba36..4990a20efa3 100644
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c ctf-decl.c ctf-error.c \
 diff --git a/libctf/Makefile.in b/libctf/Makefile.in
-index 036a63fa720..e971f0b31bb 100644
+index f2b852e3fae..14fc79bf5a9 100644
 --- a/libctf/Makefile.in
 +++ b/libctf/Makefile.in
-@@ -383,6 +383,7 @@ AUTOCONF = @AUTOCONF@
+@@ -381,6 +381,7 @@ AUTOCONF = @AUTOCONF@
  AUTOHEADER = @AUTOHEADER@
  AUTOMAKE = @AUTOMAKE@
  AWK = @AWK@
@@ -56,7 +56,7 @@ index 036a63fa720..e971f0b31bb 100644
  CATALOGS = @CATALOGS@
  CATOBJEXT = @CATOBJEXT@
  CC = @CC@
-@@ -405,6 +406,7 @@ EXEEXT = @EXEEXT@
+@@ -403,6 +404,7 @@ EXEEXT = @EXEEXT@
  
  # Setup the testing framework, if you have one
  EXPECT = expect
@@ -64,7 +64,7 @@ index 036a63fa720..e971f0b31bb 100644
  FGREP = @FGREP@
  GENCAT = @GENCAT@
  GMSGFMT = @GMSGFMT@
-@@ -547,8 +549,13 @@ AM_CFLAGS = -std=gnu99 @ac_libctf_warn_cflags@ @warn@ @c_warn@ @WARN_PEDANTIC@ @
+@@ -540,8 +542,13 @@ AM_CFLAGS = -std=gnu99 @ac_libctf_warn_cflags@ @warn@ @c_warn@ @WARN_PEDANTIC@ @
  @INSTALL_LIBBFD_FALSE@include_HEADERS = 
  @INSTALL_LIBBFD_TRUE@include_HEADERS = $(INCDIR)/ctf.h $(INCDIR)/ctf-api.h
  @INSTALL_LIBBFD_FALSE@noinst_LTLIBRARIES = libctf.la libctf-nobfd.la
@@ -80,7 +80,7 @@ index 036a63fa720..e971f0b31bb 100644
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c \
 diff --git a/libctf/configure b/libctf/configure
-index 176b3d6b918..31fe5f72a90 100755
+index 17463a74cca..b0b5c78a7a6 100755
 --- a/libctf/configure
 +++ b/libctf/configure
 @@ -646,6 +646,10 @@ BUILD_INFO_FALSE
@@ -93,43 +93,43 @@ index 176b3d6b918..31fe5f72a90 100755
 +EXTRA_SOVERSION_SUFFIX
  ENABLE_LIBCTF_HASH_DEBUGGING_FALSE
  ENABLE_LIBCTF_HASH_DEBUGGING_TRUE
- ZSTD_LIBS
-@@ -813,6 +817,7 @@ enable_install_libbfd
+ zlibinc
+@@ -807,6 +811,7 @@ enable_maintainer_mode
+ enable_install_libbfd
  with_system_zlib
- with_zstd
  enable_libctf_hash_debugging
 +with_extra_soversion_suffix
  '
        ac_precious_vars='build_alias
  host_alias
-@@ -1477,6 +1482,8 @@ Optional Packages:
+@@ -1464,6 +1469,8 @@ Optional Packages:
+                           both]
+   --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
    --with-system-zlib      use installed libz
-   --with-zstd             support zstd compressed debug sections
-                           (default=auto)
 +  --with-extra-soversion-suffix=SUFFIX
 +                          Append '.SUFFIX' to SONAME [[default=]]
  
  Some influential environment variables:
    CC          C compiler command
-@@ -11655,7 +11662,7 @@ else
+@@ -11632,7 +11639,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 11658 "configure"
+-#line 11635 "configure"
 +#line 11665 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -11761,7 +11768,7 @@ else
+@@ -11738,7 +11745,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 11764 "configure"
+-#line 11741 "configure"
 +#line 11771 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -13209,6 +13216,26 @@ else
+@@ -14305,6 +14312,26 @@ else
  fi
  
  
@@ -156,7 +156,7 @@ index 176b3d6b918..31fe5f72a90 100755
  # Similar to GDB_AC_CHECK_BFD.
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
-@@ -14101,6 +14128,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
+@@ -15199,6 +15226,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
    as_fn_error $? "conditional \"ENABLE_LIBCTF_HASH_DEBUGGING\" was never defined.
  Usually this means the macro was only invoked conditionally." "$LINENO" 5
  fi
@@ -168,10 +168,10 @@ index 176b3d6b918..31fe5f72a90 100755
  if test -z "${NEED_CTF_QSORT_R_TRUE}" && test -z "${NEED_CTF_QSORT_R_FALSE}"; then
    as_fn_error $? "conditional \"NEED_CTF_QSORT_R\" was never defined.
 diff --git a/libctf/configure.ac b/libctf/configure.ac
-index 2e2ccf4b624..fbe5f27241b 100644
+index a0148a4c328..1901ade381d 100644
 --- a/libctf/configure.ac
 +++ b/libctf/configure.ac
-@@ -79,6 +79,16 @@ if test "${enable_libctf_hash_debugging}" = yes; then
+@@ -76,6 +76,16 @@ if test "${enable_libctf_hash_debugging}" = yes; then
  fi
  AM_CONDITIONAL(ENABLE_LIBCTF_HASH_DEBUGGING, test "${enable_libctf_hash_debugging}" = yes)
  
@@ -189,5 +189,5 @@ index 2e2ccf4b624..fbe5f27241b 100644
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
 -- 
-2.38.0
+2.38.2
 

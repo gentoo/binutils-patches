@@ -1,4 +1,4 @@
-From eaf58344eafc9b9943a0bd7e9e00130965b10274 Mon Sep 17 00:00:00 2001
+From febeab1e92e6aaf19a3a67a8729cbe0a444ddf59 Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Tue, 20 Jul 2021 21:08:31 +0200
 Subject: [PATCH 1/6] Gentoo: gold/ld: add support for poisoned system
@@ -44,7 +44,7 @@ Ported to binutils 2.39 by WANG Xuerui <xen0n@gentoo.org>
  11 files changed, 150 insertions(+), 2 deletions(-)
 
 diff --git a/gold/options.cc b/gold/options.cc
-index 04be98a3e39..64439f8af7a 100644
+index c9834b66159..bd3e948a61b 100644
 --- a/gold/options.cc
 +++ b/gold/options.cc
 @@ -1355,6 +1355,39 @@ General_options::finalize()
@@ -88,7 +88,7 @@ index 04be98a3e39..64439f8af7a 100644
    if (this->shared() && this->is_static())
      gold_fatal(_("-shared and -static are incompatible"));
 diff --git a/gold/options.h b/gold/options.h
-index 17236eb9cb9..dad649870bf 100644
+index 1aa451c7711..524c7c859df 100644
 --- a/gold/options.h
 +++ b/gold/options.h
 @@ -1398,6 +1398,13 @@ class General_options
@@ -106,10 +106,10 @@ index 17236eb9cb9..dad649870bf 100644
  	      N_("Warn when skipping an incompatible library"),
  	      N_("Don't warn when skipping an incompatible library"));
 diff --git a/ld/config.in b/ld/config.in
-index 3916740eee4..7e70b0179ea 100644
+index ad0dc6a106c..d21edaddce7 100644
 --- a/ld/config.in
 +++ b/ld/config.in
-@@ -55,6 +55,9 @@
+@@ -58,6 +58,9 @@
     language is requested. */
  #undef ENABLE_NLS
  
@@ -120,10 +120,10 @@ index 3916740eee4..7e70b0179ea 100644
  #undef EXTRA_SHLIB_EXTENSION
  
 diff --git a/ld/configure b/ld/configure
-index 9dd3ed5f1e7..a9a67a8babe 100755
+index 03b9e46f56d..091d5913ee4 100755
 --- a/ld/configure
 +++ b/ld/configure
-@@ -838,6 +838,7 @@ with_lib_path
+@@ -839,6 +839,7 @@ with_lib_path
  enable_targets
  enable_64_bit_bfd
  with_sysroot
@@ -131,7 +131,7 @@ index 9dd3ed5f1e7..a9a67a8babe 100755
  enable_gold
  enable_got
  enable_compressed_debug_sections
-@@ -1519,6 +1520,8 @@ Optional Features:
+@@ -1521,6 +1522,8 @@ Optional Features:
    --enable-checking       enable run-time checks
    --enable-targets        alternative target configurations
    --enable-64-bit-bfd     64-bit support (on hosts with narrower word sizes)
@@ -140,25 +140,25 @@ index 9dd3ed5f1e7..a9a67a8babe 100755
    --enable-gold[=ARG]     build gold [ARG={default,yes,no}]
    --enable-got=<type>     GOT handling scheme (target, single, negative,
                            multigot)
-@@ -11620,7 +11623,7 @@ else
+@@ -11625,7 +11628,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 11623 "configure"
+-#line 11628 "configure"
 +#line 11626 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -11726,7 +11729,7 @@ else
+@@ -11731,7 +11734,7 @@ else
    lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
    lt_status=$lt_dlunknown
    cat > conftest.$ac_ext <<_LT_EOF
--#line 11729 "configure"
+-#line 11734 "configure"
 +#line 11732 "configure"
  #include "confdefs.h"
  
  #if HAVE_DLFCN_H
-@@ -15478,6 +15481,19 @@ fi
+@@ -15483,6 +15486,19 @@ fi
  
  
  
@@ -179,7 +179,7 @@ index 9dd3ed5f1e7..a9a67a8babe 100755
  if test "${enable_gold+set}" = set; then :
    enableval=$enable_gold; case "${enableval}" in
 diff --git a/ld/configure.ac b/ld/configure.ac
-index f1b2f9897f8..1927d79e728 100644
+index 77edac3258c..a74dac63038 100644
 --- a/ld/configure.ac
 +++ b/ld/configure.ac
 @@ -103,6 +103,16 @@ AC_SUBST(use_sysroot)
@@ -200,10 +200,10 @@ index f1b2f9897f8..1927d79e728 100644
  dnl "install_as_default" is set to false if gold is the default linker.
  dnl "installed_linker" is the installed BFD linker name.
 diff --git a/ld/ld.h b/ld/ld.h
-index f3086bf30de..90cf1ca51e5 100644
+index 05649ff61b8..ce9e8229ac5 100644
 --- a/ld/ld.h
 +++ b/ld/ld.h
-@@ -162,6 +162,13 @@ typedef struct
+@@ -163,6 +163,13 @@ typedef struct
       in the linker script.  */
    bool force_group_allocation;
  
@@ -218,10 +218,10 @@ index f3086bf30de..90cf1ca51e5 100644
    enum endian_enum endian;
  
 diff --git a/ld/ld.texi b/ld/ld.texi
-index 9daed2e7e9f..d76b534a456 100644
+index db3a9f09b45..5b543914e67 100644
 --- a/ld/ld.texi
 +++ b/ld/ld.texi
-@@ -2952,6 +2952,24 @@ creation of the metadata note, if one had been enabled by an earlier
+@@ -2960,6 +2960,24 @@ creation of the metadata note, if one had been enabled by an earlier
  occurrence of the --package-metdata option.
  If the linker has been built with libjansson, then the JSON string
  will be validated.
@@ -247,7 +247,7 @@ index 9daed2e7e9f..d76b534a456 100644
  
  @c man end
 diff --git a/ld/ldfile.c b/ld/ldfile.c
-index 731ae5f7aed..6b67e29041b 100644
+index b8fd4e5d8e0..639204f4c29 100644
 --- a/ld/ldfile.c
 +++ b/ld/ldfile.c
 @@ -117,6 +117,26 @@ ldfile_add_library_path (const char *name, bool cmdline)
@@ -278,10 +278,10 @@ index 731ae5f7aed..6b67e29041b 100644
  
  /* Try to open a BFD for a lang_input_statement.  */
 diff --git a/ld/ldlex.h b/ld/ldlex.h
-index 57ade1f754b..b35a6122e09 100644
+index 0538f0a06a1..82685348055 100644
 --- a/ld/ldlex.h
 +++ b/ld/ldlex.h
-@@ -149,6 +149,9 @@ enum option_values
+@@ -151,6 +151,9 @@ enum option_values
    OPTION_PRINT_OUTPUT_FORMAT,
    OPTION_PRINT_SYSROOT,
    OPTION_IGNORE_UNRESOLVED_SYMBOL,
@@ -292,7 +292,7 @@ index 57ade1f754b..b35a6122e09 100644
    OPTION_POP_STATE,
    OPTION_DISABLE_MULTIPLE_DEFS_ABS,
 diff --git a/ld/ldmain.c b/ld/ldmain.c
-index d63002c994a..55364ef5773 100644
+index 9290a189b0d..da25dbb13b7 100644
 --- a/ld/ldmain.c
 +++ b/ld/ldmain.c
 @@ -321,6 +321,13 @@ main (int argc, char **argv)
@@ -310,10 +310,10 @@ index d63002c994a..55364ef5773 100644
    /* We initialize DEMANGLING based on the environment variable
       COLLECT_NO_DEMANGLE.  The gcc collect2 program will demangle the
 diff --git a/ld/lexsup.c b/ld/lexsup.c
-index 299371fb775..02816ebb1b6 100644
+index c5960385572..950b6969cb8 100644
 --- a/ld/lexsup.c
 +++ b/ld/lexsup.c
-@@ -579,6 +579,18 @@ static const struct ld_option ld_options[] =
+@@ -584,6 +584,18 @@ static const struct ld_option ld_options[] =
      OPTION_IGNORE_UNRESOLVED_SYMBOL},
      '\0', N_("SYMBOL"),
      N_("Unresolved SYMBOL will not cause an error or warning"), TWO_DASHES },
@@ -332,7 +332,7 @@ index 299371fb775..02816ebb1b6 100644
    { {"push-state", no_argument, NULL, OPTION_PUSH_STATE},
      '\0', NULL, N_("Push state of flags governing input file handling"),
      TWO_DASHES },
-@@ -1679,6 +1691,18 @@ parse_args (unsigned argc, char **argv)
+@@ -1692,6 +1704,18 @@ parse_args (unsigned argc, char **argv)
  	  }
  	  break;
  
@@ -352,5 +352,5 @@ index 299371fb775..02816ebb1b6 100644
  	  input_flags.pushed = xmemdup (&input_flags,
  					sizeof (input_flags),
 -- 
-2.38.0
+2.38.2
 
