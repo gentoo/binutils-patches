@@ -1,0 +1,26 @@
+From 0564593ab415665b6de8089debf4a0205582d8ef Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
+Date: Tue, 3 Jan 2023 22:39:24 +0100
+Subject: [PATCH 2/2] ld testsuite: un-xfail pr19719 tests on aarch64, seems to
+ succeed now
+
+---
+ ld/testsuite/ld-elf/shared.exp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ld/testsuite/ld-elf/shared.exp b/ld/testsuite/ld-elf/shared.exp
+index 6dd99bb5c9d..db9d71398de 100644
+--- a/ld/testsuite/ld-elf/shared.exp
++++ b/ld/testsuite/ld-elf/shared.exp
+@@ -1656,7 +1656,7 @@ proc mix_pic_and_non_pic {xfails cflags ldflags exe} {
+     }
+ }
+ 
+-mix_pic_and_non_pic [list "arm*-*-*" "aarch64*-*-*"] "" "" "pr19719"
++mix_pic_and_non_pic [list "arm*-*-*"] "" "" "pr19719"
+ mix_pic_and_non_pic [] "-fPIE" "-pie" "pr19719pie"
+ 
+ set AFLAGS_PIE ""
+-- 
+2.38.2
+

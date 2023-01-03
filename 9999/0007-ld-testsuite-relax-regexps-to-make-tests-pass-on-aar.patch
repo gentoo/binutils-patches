@@ -1,0 +1,52 @@
+From 80c4388424197f5994fa71646fe81ba77b69d996 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
+Date: Tue, 3 Jan 2023 22:23:02 +0100
+Subject: [PATCH 1/2] ld testsuite: relax regexps to make tests pass on
+ aarch64, bug 29843
+
+---
+ ld/testsuite/ld-aarch64/bti-plt-5.d              | 8 ++++----
+ ld/testsuite/ld-aarch64/tls-relax-gdesc-le-now.d | 2 +-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/ld/testsuite/ld-aarch64/bti-plt-5.d b/ld/testsuite/ld-aarch64/bti-plt-5.d
+index 12abbc2e055..ed0029b8de1 100644
+--- a/ld/testsuite/ld-aarch64/bti-plt-5.d
++++ b/ld/testsuite/ld-aarch64/bti-plt-5.d
+@@ -13,8 +13,8 @@ Disassembly of section \.plt:
+ .*:	d503245f 	bti	c
+ .*:	a9bf7bf0 	stp	x16, x30, \[sp, #-16\]!
+ .*:	90000090 	adrp	x16, 410000 <.*>
+-.*:	f9421611 	ldr	x17, \[x16, #1064\]
+-.*:	9110a210 	add	x16, x16, #0x428
++.*:	f9...... 	ldr	x17, \[x16, #....\]
++.*:	91...... 	add	x16, x16, #0x...
+ .*:	d61f0220 	br	x17
+ .*:	d503201f 	nop
+ .*:	d503201f 	nop
+@@ -22,7 +22,7 @@ Disassembly of section \.plt:
+ [0-9a-f]+ <.*>:
+ .*:	d503245f 	bti	c
+ .*:	90000090 	adrp	x16, 410000 <.*>
+-.*:	f9421a11 	ldr	x17, \[x16, #1072\]
+-.*:	9110c210 	add	x16, x16, #0x430
++.*:	f9...... 	ldr	x17, \[x16, #....\]
++.*:	91...... 	add	x16, x16, #0x...
+ .*:	d61f0220 	br	x17
+ .*:	d503201f 	nop
+diff --git a/ld/testsuite/ld-aarch64/tls-relax-gdesc-le-now.d b/ld/testsuite/ld-aarch64/tls-relax-gdesc-le-now.d
+index 8b6dceff81b..dcf913428fb 100644
+--- a/ld/testsuite/ld-aarch64/tls-relax-gdesc-le-now.d
++++ b/ld/testsuite/ld-aarch64/tls-relax-gdesc-le-now.d
+@@ -11,7 +11,7 @@
+  0x.+ \(PLTRELSZ\) \s+.+ \(bytes\)
+  0x.+ \(PLTREL\)   \s+RELA
+  0x.+ \(JMPREL\)   \s+0x.+
+- 0x.+ \(BIND_NOW\) \s+
++ 0x.+ (\(BIND_NOW\) \s+|\(FLAGS\)  \s+   BIND_NOW)
+  0x.+ \(FLAGS_1\)  \s+   Flags: NOW
+  0x.+ \(NULL\)     \s+   0x0
+ 
+-- 
+2.38.2
+
