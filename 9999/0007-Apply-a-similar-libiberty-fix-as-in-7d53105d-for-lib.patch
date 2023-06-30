@@ -1,8 +1,8 @@
-From afc5e9fab399c9164f7355b69d0e23318d0559a5 Mon Sep 17 00:00:00 2001
+From d76981d4b7bb9bc31825a3ccf5a075ac2694a4c0 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Wed, 22 Feb 2023 20:05:35 +0100
-Subject: [PATCH] Apply a similar libiberty fix as in 7d53105d for libopcodes
- and libgprofng
+Subject: [PATCH 7/7] Apply a similar libiberty fix as in 7d53105d for
+ libopcodes and libgprofng
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -18,7 +18,7 @@ Signed-off-by: Andreas K. Hüttel <dilfridge@gentoo.org>
  4 files changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/gprofng/src/Makefile.am b/gprofng/src/Makefile.am
-index ab90bb08c5f..96256faf788 100644
+index 219367fb9ce..d9365260e8d 100644
 --- a/gprofng/src/Makefile.am
 +++ b/gprofng/src/Makefile.am
 @@ -131,7 +131,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
@@ -32,10 +32,10 @@ index ab90bb08c5f..96256faf788 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/gprofng/src/Makefile.in b/gprofng/src/Makefile.in
-index 605fa4f6fd4..f968d8d6e59 100644
+index b881268b0d9..0e8b707f7d7 100644
 --- a/gprofng/src/Makefile.in
 +++ b/gprofng/src/Makefile.in
-@@ -555,7 +555,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
+@@ -552,7 +552,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
  # Pass -lpthread instead of $(PTHREAD_LIBS) due to $(PTHREAD_LIBS) being empty
  # when -nostdlib is passed to libtool.
  # See bug 29364 - libgprofng.so: needs to link against -pthread
@@ -46,7 +46,7 @@ index 605fa4f6fd4..f968d8d6e59 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/opcodes/configure b/opcodes/configure
-index d2364991ee8..1f483e37fc9 100755
+index 8717d99ca26..fbdf41f87be 100755
 --- a/opcodes/configure
 +++ b/opcodes/configure
 @@ -12445,10 +12445,10 @@ if test "$enable_shared" = "yes"; then
@@ -80,5 +80,5 @@ index 1beb72e87e0..79310916f7d 100644
        ;;
    esac
 -- 
-2.39.2
+2.40.0
 

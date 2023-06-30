@@ -1,7 +1,7 @@
-From b1e693934cde0f00e0b2fea50753e0f965bf7f88 Mon Sep 17 00:00:00 2001
+From 36fef3463cc9273249699cf372bf9cb59744df36 Mon Sep 17 00:00:00 2001
 From: Sergei Trofimovich <slyfox@gentoo.org>
 Date: Tue, 20 Jul 2021 21:12:38 +0200
-Subject: [PATCH 3/6] Gentoo: add --with-extra-soversion-suffix= option
+Subject: [PATCH 3/7] Gentoo: add --with-extra-soversion-suffix= option
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -34,7 +34,7 @@ Ported to binutils 2.37 by Andreas K. Hüttel <dilfridge@gentoo.org>
  4 files changed, 29 insertions(+)
 
 diff --git a/bfd/Makefile.am b/bfd/Makefile.am
-index 75d21db88d1..9137f025b87 100644
+index 5c5fdefd3b8..fe26bbf4f0f 100644
 --- a/bfd/Makefile.am
 +++ b/bfd/Makefile.am
 @@ -64,6 +64,8 @@ bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
@@ -46,7 +46,7 @@ index 75d21db88d1..9137f025b87 100644
  # bfd.h goes here, for now
  BFD_H = bfd.h
  
-@@ -994,6 +996,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+@@ -976,6 +978,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
  	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
  	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
  	fi ;\
@@ -57,10 +57,10 @@ index 75d21db88d1..9137f025b87 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/Makefile.in b/bfd/Makefile.in
-index 0b0bb1a950e..0ee27ecc111 100644
+index 4edfedee924..70a2442957e 100644
 --- a/bfd/Makefile.in
 +++ b/bfd/Makefile.in
-@@ -355,6 +355,7 @@ ECHO_T = @ECHO_T@
+@@ -342,6 +342,7 @@ ECHO_T = @ECHO_T@
  EGREP = @EGREP@
  EXEEXT = @EXEEXT@
  EXEEXT_FOR_BUILD = @EXEEXT_FOR_BUILD@
@@ -68,7 +68,7 @@ index 0b0bb1a950e..0ee27ecc111 100644
  FGREP = @FGREP@
  GENCAT = @GENCAT@
  GMSGFMT = @GMSGFMT@
-@@ -2474,6 +2475,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+@@ -2435,6 +2436,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
  	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
  	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
  	fi ;\
@@ -79,7 +79,7 @@ index 0b0bb1a950e..0ee27ecc111 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/configure b/bfd/configure
-index 5af8af2ee37..42bd8f32145 100755
+index 41d280ef461..18e7e3acdbd 100755
 --- a/bfd/configure
 +++ b/bfd/configure
 @@ -695,6 +695,7 @@ WARN_CFLAGS
@@ -124,7 +124,7 @@ index 5af8af2ee37..42bd8f32145 100755
  
  # Check whether --with-pkgversion was given.
 diff --git a/bfd/configure.ac b/bfd/configure.ac
-index 82a3d1f832e..2b882c735d4 100644
+index f044616f4d9..f22a87f8f54 100644
 --- a/bfd/configure.ac
 +++ b/bfd/configure.ac
 @@ -168,6 +168,13 @@ AC_ARG_WITH(separate-debug-dir,
@@ -142,5 +142,5 @@ index 82a3d1f832e..2b882c735d4 100644
  ACX_BUGURL([https://sourceware.org/bugzilla/])
  
 -- 
-2.38.2
+2.40.0
 
