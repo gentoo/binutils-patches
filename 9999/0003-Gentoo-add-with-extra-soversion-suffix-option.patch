@@ -1,4 +1,4 @@
-From 36fef3463cc9273249699cf372bf9cb59744df36 Mon Sep 17 00:00:00 2001
+From 3a489acb4547c320ba43858ead3586fed34c92b4 Mon Sep 17 00:00:00 2001
 From: Sergei Trofimovich <slyfox@gentoo.org>
 Date: Tue, 20 Jul 2021 21:12:38 +0200
 Subject: [PATCH 3/7] Gentoo: add --with-extra-soversion-suffix= option
@@ -79,7 +79,7 @@ index 4edfedee924..70a2442957e 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/configure b/bfd/configure
-index 41d280ef461..18e7e3acdbd 100755
+index dcb10317390..94a4e39d691 100755
 --- a/bfd/configure
 +++ b/bfd/configure
 @@ -695,6 +695,7 @@ WARN_CFLAGS
@@ -142,5 +142,5 @@ index f044616f4d9..f22a87f8f54 100644
  ACX_BUGURL([https://sourceware.org/bugzilla/])
  
 -- 
-2.40.0
+2.41.0
 

@@ -1,4 +1,4 @@
-From c7ff4b542556d68004ccc30e2da25c56380dcea2 Mon Sep 17 00:00:00 2001
+From 1de1744597aa5b2e29ddedfea42cd7f99796b0ec Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 24 Jul 2021 15:20:16 +0200
 Subject: [PATCH 5/7] Gentoo: Give also libctf optionally a gentoo-specific
@@ -189,5 +189,5 @@ index 6a5eade1855..a0e65a4aeda 100644
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
 -- 
-2.40.0
+2.41.0
 

@@ -1,4 +1,4 @@
-From 38cf5d1565c113e64a5cdfc9d55d554919bc10d7 Mon Sep 17 00:00:00 2001
+From 930c326fd4f16299f06610cf3ff3ee94b13130e0 Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Tue, 20 Jul 2021 21:08:31 +0200
 Subject: [PATCH 1/7] Gentoo: gold/ld: add support for poisoned system
@@ -120,7 +120,7 @@ index ad0dc6a106c..d21edaddce7 100644
  #undef EXTRA_SHLIB_EXTENSION
  
 diff --git a/ld/configure b/ld/configure
-index 03b9e46f56d..091d5913ee4 100755
+index 0c32b16241a..549b8d49f5e 100755
 --- a/ld/configure
 +++ b/ld/configure
 @@ -839,6 +839,7 @@ with_lib_path
@@ -247,7 +247,7 @@ index aa8b1aa86eb..b57b0d5c9f5 100644
  
  @c man end
 diff --git a/ld/ldfile.c b/ld/ldfile.c
-index c8a6874978b..6ba20992b66 100644
+index df7c9cbd65e..ed15262e0bc 100644
 --- a/ld/ldfile.c
 +++ b/ld/ldfile.c
 @@ -327,6 +327,26 @@ ldfile_add_library_path (const char *name, bool cmdline)
@@ -292,7 +292,7 @@ index 87cac02141d..d79ec8faa15 100644
    OPTION_POP_STATE,
    OPTION_DISABLE_MULTIPLE_DEFS_ABS,
 diff --git a/ld/ldmain.c b/ld/ldmain.c
-index 25cc89b72f9..9c81fd6f539 100644
+index 06ac2c64fa8..5ec931a0255 100644
 --- a/ld/ldmain.c
 +++ b/ld/ldmain.c
 @@ -325,6 +325,13 @@ main (int argc, char **argv)
@@ -352,5 +352,5 @@ index fe8722313fe..5fd7350efc5 100644
  	  input_flags.pushed = xmemdup (&input_flags,
  					sizeof (input_flags),
 -- 
-2.40.0
+2.41.0
 
