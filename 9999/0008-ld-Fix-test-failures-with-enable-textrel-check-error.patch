@@ -1,0 +1,139 @@
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <SRS0=Su1r=DO=gentoo.org=sam@sourceware.org>
+Received: from smtp.gentoo.org (woodpecker.gentoo.org [140.211.166.183])
+	by sourceware.org (Postfix) with ESMTP id 3725A3858D20
+	for <binutils@sourceware.org>; Fri, 28 Jul 2023 15:20:56 +0000 (GMT)
+DMARC-Filter: OpenDMARC Filter v1.4.2 sourceware.org 3725A3858D20
+Authentication-Results: sourceware.org; dmarc=pass (p=none dis=none) header.from=gentoo.org
+Authentication-Results: sourceware.org; spf=pass smtp.mailfrom=gentoo.org
+From: Sam James <sam@gentoo.org>
+To: binutils@sourceware.org
+Cc: nickc@redhat.com,
+	Sam James <sam@gentoo.org>
+Subject: [PATCH] ld: Fix test failures with --enable-textrel-check=error
+Date: Fri, 28 Jul 2023 16:20:34 +0100
+Message-ID: <20230728152042.401562-1-sam@gentoo.org>
+X-Mailer: git-send-email 2.41.0
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+X-Spam-Status: No, score=-9.9 required=5.0 tests=BAYES_00,GIT_PATCH_0,JMQ_SPF_NEUTRAL,KAM_DMARC_STATUS,RCVD_IN_MSPIKE_H3,RCVD_IN_MSPIKE_WL,SPF_HELO_PASS,SPF_PASS,TXREP,T_SCC_BODY_TEXT_LINE autolearn=ham autolearn_force=no version=3.4.6
+X-Spam-Checker-Version: SpamAssassin 3.4.6 (2021-04-09) on server2.sourceware.org
+List-Id: <binutils.sourceware.org>
+
+Tested with the following:
+* --enable-textrel-check=error
+* --enable-warn-execstack=yes
+* --enable-warn-rwx-segments=yes
+* --enable-default-execstack=no
+in preparation for hopefully toggling these in Gentoo Hardened
+at least.
+
+This is similar in nature to 0ab7005043ee404dabfd690952efc25c399995ae
+and 340640f710e690b37c885166949595cde5f827b2.
+
+This fixes the following test failures:
+* FAIL: ld-x86-64/pr18801a
+* FAIL: ld-x86-64/pr18801b
+* FAIL: ld-x86-64/ifunc-textrel-1a
+* FAIL: ld-x86-64/ifunc-textrel-1b
+* FAIL: ld-i386/pr18801a
+* FAIL: ld-i386/pr18801b
+* FAIL: ld-i386/ifunc-textrel-1a
+* FAIL: ld-i386/ifunc-textrel-1b
+
+Signed-off-by: Sam James <sam@gentoo.org>
+---
+ ld/testsuite/ld-i386/ifunc-textrel-1a.d   | 2 +-
+ ld/testsuite/ld-i386/ifunc-textrel-1b.d   | 2 +-
+ ld/testsuite/ld-i386/pr18801a.d           | 2 +-
+ ld/testsuite/ld-i386/pr18801b.d           | 2 +-
+ ld/testsuite/ld-x86-64/ifunc-textrel-1a.d | 2 +-
+ ld/testsuite/ld-x86-64/ifunc-textrel-1b.d | 2 +-
+ ld/testsuite/ld-x86-64/pr18801a.d         | 2 +-
+ ld/testsuite/ld-x86-64/pr18801b.d         | 2 +-
+ 8 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/ld/testsuite/ld-i386/ifunc-textrel-1a.d b/ld/testsuite/ld-i386/ifunc-textrel-1a.d
+index 15f545db03d..aad77e7d230 100644
+--- a/ld/testsuite/ld-i386/ifunc-textrel-1a.d
++++ b/ld/testsuite/ld-i386/ifunc-textrel-1a.d
+@@ -1,4 +1,4 @@
+ #source: ../ld-x86-64/ifunc-textrel-1.s
+ #as: --32
+-#ld: -m elf_i386 -pie
++#ld: -m elf_i386 -pie -z notext
+ #warning: GNU indirect functions with DT_TEXTREL may result in a segfault at runtime; recompile with -fPIE
+diff --git a/ld/testsuite/ld-i386/ifunc-textrel-1b.d b/ld/testsuite/ld-i386/ifunc-textrel-1b.d
+index 6e4a67c48f0..bf0f2ac5df9 100644
+--- a/ld/testsuite/ld-i386/ifunc-textrel-1b.d
++++ b/ld/testsuite/ld-i386/ifunc-textrel-1b.d
+@@ -1,4 +1,4 @@
+ #source: ../ld-x86-64/ifunc-textrel-1.s
+ #as: --32
+-#ld: -m elf_i386 -shared
++#ld: -m elf_i386 -shared -z notext
+ #warning: GNU indirect functions with DT_TEXTREL may result in a segfault at runtime; recompile with -fPIC
+diff --git a/ld/testsuite/ld-i386/pr18801a.d b/ld/testsuite/ld-i386/pr18801a.d
+index 73cb5d17beb..b1ef145a882 100644
+--- a/ld/testsuite/ld-i386/pr18801a.d
++++ b/ld/testsuite/ld-i386/pr18801a.d
+@@ -1,4 +1,4 @@
+ #source: pr18801.s
+ #as: --32
+-#ld: -m elf_i386 -pie
++#ld: -m elf_i386 -pie -z notext
+ #warning: GNU indirect functions with DT_TEXTREL may result in a segfault at runtime; recompile with -fPIE
+diff --git a/ld/testsuite/ld-i386/pr18801b.d b/ld/testsuite/ld-i386/pr18801b.d
+index 0bf7fb729cb..983346ca248 100644
+--- a/ld/testsuite/ld-i386/pr18801b.d
++++ b/ld/testsuite/ld-i386/pr18801b.d
+@@ -1,4 +1,4 @@
+ #source: pr18801.s
+ #as: --32
+-#ld: -m elf_i386 -shared
++#ld: -m elf_i386 -shared -z notext
+ #warning: GNU indirect functions with DT_TEXTREL may result in a segfault at runtime; recompile with -fPIC
+diff --git a/ld/testsuite/ld-x86-64/ifunc-textrel-1a.d b/ld/testsuite/ld-x86-64/ifunc-textrel-1a.d
+index 64a1e7021fd..667366091b9 100644
+--- a/ld/testsuite/ld-x86-64/ifunc-textrel-1a.d
++++ b/ld/testsuite/ld-x86-64/ifunc-textrel-1a.d
+@@ -1,4 +1,4 @@
+ #source: ifunc-textrel-1.s
+ #as: --64 -defsym __x86_64__=1
+-#ld: -m elf_x86_64 -pie
++#ld: -m elf_x86_64 -pie -z notext
+ #warning: GNU indirect functions with DT_TEXTREL may result in a segfault at runtime; recompile with -fPIE
+diff --git a/ld/testsuite/ld-x86-64/ifunc-textrel-1b.d b/ld/testsuite/ld-x86-64/ifunc-textrel-1b.d
+index aeb31fdb3dc..f7b8e02a72c 100644
+--- a/ld/testsuite/ld-x86-64/ifunc-textrel-1b.d
++++ b/ld/testsuite/ld-x86-64/ifunc-textrel-1b.d
+@@ -1,4 +1,4 @@
+ #source: ifunc-textrel-1.s
+ #as: --64 -defsym __x86_64__=1
+-#ld: -m elf_x86_64 -shared
++#ld: -m elf_x86_64 -shared -z notext
+ #warning: GNU indirect functions with DT_TEXTREL may result in a segfault at runtime; recompile with -fPIC
+diff --git a/ld/testsuite/ld-x86-64/pr18801a.d b/ld/testsuite/ld-x86-64/pr18801a.d
+index 2b4159d3044..61f9d991185 100644
+--- a/ld/testsuite/ld-x86-64/pr18801a.d
++++ b/ld/testsuite/ld-x86-64/pr18801a.d
+@@ -1,4 +1,4 @@
+ #source: pr18801.s
+ #as: --64
+-#ld: -melf_x86_64 -pie
++#ld: -melf_x86_64 -pie -z notext
+ #warning: GNU indirect functions with DT_TEXTREL may result in a segfault at runtime; recompile with -fPIE
+diff --git a/ld/testsuite/ld-x86-64/pr18801b.d b/ld/testsuite/ld-x86-64/pr18801b.d
+index 34dab1aa6cb..967a339f90b 100644
+--- a/ld/testsuite/ld-x86-64/pr18801b.d
++++ b/ld/testsuite/ld-x86-64/pr18801b.d
+@@ -1,4 +1,4 @@
+ #source: pr18801.s
+ #as: --64
+-#ld: -melf_x86_64 -shared
++#ld: -melf_x86_64 -shared -z notext
+ #warning: GNU indirect functions with DT_TEXTREL may result in a segfault at runtime; recompile with -fPIC
+-- 
+2.41.0
+
+
