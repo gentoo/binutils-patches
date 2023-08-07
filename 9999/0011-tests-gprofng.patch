@@ -1,0 +1,164 @@
+https://inbox.sourceware.org/binutils/20230803203339.822435-1-vladimir.mezentsev@oracle.com/
+https://sourceware.org/PR30700
+
+From mboxrd@z Thu Jan  1 00:00:00 1970
+Return-Path: <SRS0=V8/R=DU=oracle.com=vladimir.mezentsev@sourceware.org>
+Received: from mx0b-00069f02.pphosted.com (mx0b-00069f02.pphosted.com [205.220.177.32])
+	by sourceware.org (Postfix) with ESMTPS id 7F83B3858D38
+	for <binutils@sourceware.org>; Thu,  3 Aug 2023 20:33:54 +0000 (GMT)
+DMARC-Filter: OpenDMARC Filter v1.4.2 sourceware.org 7F83B3858D38
+Authentication-Results: sourceware.org; dmarc=pass (p=none dis=none) header.from=oracle.com
+Authentication-Results: sourceware.org; spf=pass smtp.mailfrom=oracle.com
+Received: from pps.filterd (m0246632.ppops.net [127.0.0.1])
+	by mx0b-00069f02.pphosted.com (8.17.1.19/8.17.1.19) with ESMTP id 373JJDB5001450
+	for <binutils@sourceware.org>; Thu, 3 Aug 2023 20:33:54 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com; h=from : to : cc :
+ subject : date : message-id : content-transfer-encoding : content-type :
+ mime-version; s=corp-2023-03-30;
+ bh=aBWH9303Y8NcOBnrwOK3V46ZpHc2uMbEHRXIxE2Mg8U=;
+ b=QXr05CxWU/hJ4gUV/hT+wrN4h0vjtTB48pepEU1M7MHli0ttn5Skv54tilAVfVKI/4cd
+ 1XlcEgN90YOHmnidsmH50z0NQ4NlFvezd1MYrs2+24ay2kIbeHKrOhDQ/EVJIvNLfpt7
+ pdZHkHpNkxl+glRpf9puwFHCFLe5Gqx6sSoz7C28I+5FMDB9/Rc3EQXtovTz90vIYSmO
+ A1PsW5C3AJG373lrpoUVxpbcxbOsH1fygEdsB4le8DRv2Pgya2WMWz3T2zL7t2gEtFCZ
+ XRbuIv+y4xYE2Q+aOJ4p5uxMbc4z3akRNes4LMwZ5U6NPRpwpOM3WFQw5x5jL6Wr6UXw zA== 
+Received: from iadpaimrmta02.imrmtpd1.prodappiadaev1.oraclevcn.com (iadpaimrmta02.appoci.oracle.com [147.154.18.20])
+	by mx0b-00069f02.pphosted.com (PPS) with ESMTPS id 3s4tcu2fek-1
+	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK)
+	for <binutils@sourceware.org>; Thu, 03 Aug 2023 20:33:53 +0000
+Received: from pps.filterd (iadpaimrmta02.imrmtpd1.prodappiadaev1.oraclevcn.com [127.0.0.1])
+	by iadpaimrmta02.imrmtpd1.prodappiadaev1.oraclevcn.com (8.17.1.19/8.17.1.19) with ESMTP id 373K58qp003980
+	for <binutils@sourceware.org>; Thu, 3 Aug 2023 20:33:51 GMT
+Received: from nam11-co1-obe.outbound.protection.outlook.com (mail-co1nam11lp2170.outbound.protection.outlook.com [104.47.56.170])
+	by iadpaimrmta02.imrmtpd1.prodappiadaev1.oraclevcn.com (PPS) with ESMTPS id 3s856rypc5-1
+	(version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK)
+	for <binutils@sourceware.org>; Thu, 03 Aug 2023 20:33:51 +0000
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector9901; d=microsoft.com; cv=none;
+ b=kZLU5BLuqIUtYWeeq/p3fogSPj1DwGv5PNeVj8xjEepBlQWfzC0ad+4n0znV8bSy0v8FqBxF1sCEZFns3lhzblg1Go5psyG/nJAvlrJ7BZQFBvNmPGwAuX2cxp49Ea7lxFwwhGUmGE1BkxanejSE0fy1gnQqGZzgbiuJfYt6lUnejJOnNTmqxI34DIAaJibRkTj/gD+rLI0k7qwgZGMslll/9ZfKz+Bpzs/oQFGA9ZY9q9xkBVGgRPVIzHHC+9V2Y2vJvbOoHa6njxS0RHCmLL9gXh0kK4rJruYUesbu3T+jOy7Kno/6uqG08NdwBrUIFaPEQUoxVXVOijvXQHr5Zw==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com;
+ s=arcselector9901;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1;
+ bh=aBWH9303Y8NcOBnrwOK3V46ZpHc2uMbEHRXIxE2Mg8U=;
+ b=ejmYk7X1Z7pY0al9fEFi1vg5hSm/VA0h9l09UExzqmPiotIxFvI639eDwaNWiylM73bCWqtKbbROnZRB3rV1iDj/U2UqBWxfHxB2rGfK5CwLFcX+em4U8F9J1gNZyOAT5HcITq6SUTQ+X2qCh7l/xyQeCp1EEiDqr6Go9U5Fgm8rtFZGEC0LQ8XHKYm33P6FBXJCxpKYv69RPQFkTnZbOf1ZOdhnbOCYBslZIivjDMTsg5nqDZkNF6Hu0CxPPDafAKxoLzBiUSgf8Uf7Eu6hCs6zmDrKqeYvPfv1KqtmivuuTvsoaqks0xCCZko6Nd2GnU1sKTotkumAXfO6Zi5BOQ==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass
+ smtp.mailfrom=oracle.com; dmarc=pass action=none header.from=oracle.com;
+ dkim=pass header.d=oracle.com; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=oracle.onmicrosoft.com; s=selector2-oracle-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=aBWH9303Y8NcOBnrwOK3V46ZpHc2uMbEHRXIxE2Mg8U=;
+ b=R6vVOn08a3k+gcCdUObb97WwvDSXIzBkR1ReaZ1dnUqS3ZyElhaRikL5Lyc3Q04w6vKd8PN7h2gkGnwA82Cm+hFEccHGB6blNJNEjOhvFX2Mg6XjMjwPNZ5xQ+rzTiGp2I765cpVdXH7qk0ObwPiTR2WhuXcK/dtWIdU4To6ADk=
+Received: from SA2PR10MB4636.namprd10.prod.outlook.com (2603:10b6:806:11e::10)
+ by SN7PR10MB6473.namprd10.prod.outlook.com (2603:10b6:806:2a0::18) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.6631.47; Thu, 3 Aug
+ 2023 20:33:49 +0000
+Received: from SA2PR10MB4636.namprd10.prod.outlook.com
+ ([fe80::a15b:c87d:10e3:5765]) by SA2PR10MB4636.namprd10.prod.outlook.com
+ ([fe80::a15b:c87d:10e3:5765%7]) with mapi id 15.20.6631.046; Thu, 3 Aug 2023
+ 20:33:49 +0000
+From: vladimir.mezentsev@oracle.com
+To: binutils@sourceware.org
+Cc: Vladimir Mezentsev <vladimir.mezentsev@oracle.com>
+Subject: [PATCH] gprofng: 30700 tmpdir/gp-collect-app_F test fails
+Date: Thu,  3 Aug 2023 13:33:39 -0700
+Message-Id: <20230803203339.822435-1-vladimir.mezentsev@oracle.com>
+X-Mailer: git-send-email 2.31.1
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain
+X-ClientProxiedBy: LO6P123CA0031.GBRP123.PROD.OUTLOOK.COM
+ (2603:10a6:600:2fe::11) To SA2PR10MB4636.namprd10.prod.outlook.com
+ (2603:10b6:806:11e::10)
+MIME-Version: 1.0
+X-MS-PublicTrafficType: Email
+X-MS-TrafficTypeDiagnostic: SA2PR10MB4636:EE_|SN7PR10MB6473:EE_
+X-MS-Office365-Filtering-Correlation-Id: 32d2aa61-d0f0-4bf7-c7e5-08db9460f18b
+X-MS-Exchange-SenderADCheck: 1
+X-MS-Exchange-AntiSpam-Relay: 0
+X-Microsoft-Antispam: BCL:0;
+X-Microsoft-Antispam-Message-Info: 
+	FtlSjDlfJ9H/HjBEUbcrniNfavhoIJJwMeiHr/7PhA98yEcoC1q9zylXvVp7m0JPVj/gnTmS4z69ouHzfKuVWqLENJB9dmRnMv+od0/AsNTwOXFrvlmWYd5TyqhBuIjoG+WuwwuwkVmmUPiKLKfNRwxTpG1gXLDhTN6Psviul8nKELjewe5C+S5mzpY5NhVwJVp4JxnsES3HmWgBTO8OvnLss+/Sr0bLQY4nYfOpHvUtWdRvrqw9S26LGlFE8Z65FJP9STwGKbuGMBerRcHqeCIXIhyGKBwV9H9CdXLn9gOkhlXmjhNzu4x8H4oSCzfo/67bC8JNYZxemIRfHR/MttqTtpBYGCgeTcVeA1rc5U89DUdc3eCf8CSP59iJgpEKWHjEsZlEeb7bcFM1MHgnOnXuWgV3Z9m5hESVpQS3AsXUVQLKvRBYny8REC27NXsUyAZ5/SJ04aJGaSQ9AIUORqw1Kky1OGzYGQocDr4CxduZ1hac+X+8bRiSCjv74qsIe6nb3TtA1AkITgFbX8gH7UOwDwRmS5b6YEARR6BshFys26Xn/ktn/opathwyrZhN
+X-Forefront-Antispam-Report: 
+	CIP:255.255.255.255;CTRY:;LANG:en;SCL:1;SRV:;IPV:NLI;SFV:NSPM;H:SA2PR10MB4636.namprd10.prod.outlook.com;PTR:;CAT:NONE;SFS:(13230028)(346002)(366004)(376002)(136003)(396003)(39860400002)(451199021)(66476007)(66556008)(66946007)(2616005)(316002)(4326008)(6916009)(5660300002)(107886003)(41300700001)(186003)(6506007)(8676002)(1076003)(8936002)(86362001)(9686003)(6512007)(6666004)(478600001)(6486002)(38100700002)(2906002)(36756003)(83380400001);DIR:OUT;SFP:1101;
+X-MS-Exchange-AntiSpam-MessageData-ChunkCount: 1
+X-MS-Exchange-AntiSpam-MessageData-0: 
+	=?us-ascii?Q?2vVQXnKygJyQd+tHtgSFfe014vrOKhj7QtnqPMa5sAkBUzF4FJTFNTsO/pC4?=
+ =?us-ascii?Q?gbe82wLSPsQ5xjf3KK41AKConilQU9fCfKMhaBEFVxH33ZS2DURmSf+gjSsJ?=
+ =?us-ascii?Q?UAf/zzFrAaUhLIdqP4Tkz6g+0SiqXyTlJOodWIvT3V6JMuKqQA9D1xHbZXF0?=
+ =?us-ascii?Q?0py1g7VYW0jYGcVzeCAq2lJsAHran5yjaHNDrR4SmoM4F9uNg2KNGw75ylRd?=
+ =?us-ascii?Q?6jbbaGKhUrlHyB9CeTNkvz71c7NH28AuAci6B5fzwuWJkcgNbLOIx41Bq/ZX?=
+ =?us-ascii?Q?Zgq4LF5BY80VuzfBGES1sjy2jFmuAsdvjYcBlnJGVcooG7qt9N6Fl/f8HUyu?=
+ =?us-ascii?Q?P1rRJB4pgLWC3egtg8vS5Lh4K0KQi0XKs7ks46aVjAiGY/IfHVIzb1L2nD+G?=
+ =?us-ascii?Q?RgCwy2Ubx//WcCBiTOQS5yjNxSFt4KZByQp99anrtZfJ8xiE6mghQyusbfWu?=
+ =?us-ascii?Q?g1AyKl5aCp8FHXW/vb906djTCM2opRpwR1GmBxXIaMpO/v8j9/eRSQ1R/niB?=
+ =?us-ascii?Q?YVZluKsc6R/xTJ2cZNeMJUcQafEYByOAik33U7t5Q9HNMWZ91jiWYsMWKVrj?=
+ =?us-ascii?Q?8fibDL3u05AmgiaNeXbYjK7ISPXHOjIRThWj+ILCkdR9Wfmlv5D1svssgxeL?=
+ =?us-ascii?Q?EFi3hdvD3shR2mvssmsOGWut6ZWbSEND49EhDnOS1nK6nvGRryfvIc8eAU9K?=
+ =?us-ascii?Q?tEujniv2fU6TygAo+5qcav55Dd1ng19ndQFZNMle7b/w9bEA9jXH7mqLpPyd?=
+ =?us-ascii?Q?nrNH8S3GeRmb9GCsePQApFOiwgv9gHDa18eSoOTBRlpltPb3HHmPCmaDZLWJ?=
+ =?us-ascii?Q?dXB+SI80yXLZCQhiR6u6wHplpH+d5GjZGjFxk3aNFtCb2EhaFq6OHz/f4R34?=
+ =?us-ascii?Q?FvutRMk+qKmCJ1/jop1nfn6tM6vFajL0AvOG6XVU9m24DxRAKd8AUDFVM/rO?=
+ =?us-ascii?Q?FI1KBQs7oEMN0dSzxl6C4pPmhQx6JXDgZoIN1e42hk2xt4bptYUZAzjKDSxw?=
+ =?us-ascii?Q?3CZ9+2dM0MjmLwaQkA9bmdGJNmK+UlBSIa2I+/iJeihktlMtgt0zQk+mUqCd?=
+ =?us-ascii?Q?+/IsDmOj9RMecwrIMFUhbUPzCUlns3ZrK9TbBxcqpK5Z1tNOF3lIlcUGnOSw?=
+ =?us-ascii?Q?I38m5CXSt4JAMsPpu379MT3JE+oVTrAjgPCOml29osBxGw/mPilKfqSfMJxi?=
+ =?us-ascii?Q?8ZesU2hceSc6WFr+kgfbZTDNqQIQKwNPVphs2w566wP8Ae66Gu9qLp6Bk5HQ?=
+ =?us-ascii?Q?cwZsfHa00oFB9vgkynYZ+mPu4dG9zV7WftOxsKEl59E/cORj3vQ24ZGMlUHG?=
+ =?us-ascii?Q?LB0jLAznZgOQmkUqVmmsqxvtD1/skR3r5CGlJ/K9FN82gYMuVRUT79ppg/r9?=
+ =?us-ascii?Q?e1JOgVXvnqlf4s2jYxQw3bi9QlyiFFy7MR9xMNLt7UdOV7+GdtALZXx+uOh3?=
+ =?us-ascii?Q?9/9DT7Pt4hWzZuKZc8kZGCrrZRBcpK753R/j7RlyFtGC9glPHkNaV5aQBJ6+?=
+ =?us-ascii?Q?Fwkt6CX12BvWW5krg2dy5ZCWkH+MBwS8/PxPbU5Z3bjW40j9fb2tTF8WUFVw?=
+ =?us-ascii?Q?NOkA45fBWCbMM84rbOEjN9VJElsbua90fGNcuLYEAxRCve6My1paBT4jV+k5?=
+ =?us-ascii?Q?pJraM4gq2jxgfMe/3re6+fc=3D?=
+X-MS-Exchange-AntiSpam-ExternalHop-MessageData-ChunkCount: 1
+X-MS-Exchange-AntiSpam-ExternalHop-MessageData-0: 
+	5BKKV4T41EwJkqBWXCUBtKfSc0Kqk+2boYpd3LY1KKydGovf7vMEW8cZdK7DpnPReGtLMTe22G8WEdn+eueR59691BC3vrpoNVoYEMczhSi6Rf9TqO5yp8jgE/YufRIst16yC1oF14s88TE0rlftBH2NAVnB/7vKVBrmDa6SSwJyRcGyF1JIB8TKCuUj2m2a/aO9nNBSNZgl1xOBWfPKt3yBwe5hvrsmAQGm8H5Ms2bT4yhwxhA4M6f9bfj2BxBSHvDuCoJx4z7WCMycJJtY37+wT070rAkDGW6u7BTQfSdoup1NNo22gp74EJGxcn0jBDf6A0Oa6mVTe8SBy8SHFkhTwShvYYuj3R6PqqcUV8d0fvtXsNWbCydtFkZSwOugpE1y3RNtvvgtVHLdRSziiPl3CsW0cQEA0aQNdDec9xQV9uYmnQAQvHYQdMB8tGyV0viNsuIae7PaDF4fl0RJsz2Cj2EeuVwQP7txJ7YoU/qLVZLeVL9kk1F7ZCFD4L7tTjxH4/DN/AUWwpMq1U6yAiL6/ByELdB+ttlOTnbtHMN7HuNlJUosjFm59yldZZgz0nM8aiK8uZbcObBcmaHok0j11xKEKl/z3BjVuqKqtOfZs4HmKOCdLSr1cmf1JcnvvCFhjW5XCZySIqechbKUidMlivSQcIPvibERILfG3c+uU26pPEAZLwos3BWiBXFdBaN+nn2bjbrD85QjpnNUg7TF5YJOEXnodgzSvwrp9vD1SiT8sx3g4YD7kKy0E7YO
+X-OriginatorOrg: oracle.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 32d2aa61-d0f0-4bf7-c7e5-08db9460f18b
+X-MS-Exchange-CrossTenant-AuthSource: SA2PR10MB4636.namprd10.prod.outlook.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 03 Aug 2023 20:33:49.4380
+ (UTC)
+X-MS-Exchange-CrossTenant-FromEntityHeader: Hosted
+X-MS-Exchange-CrossTenant-Id: 4e2c6054-71cb-48f1-bd6c-3a9705aca71b
+X-MS-Exchange-CrossTenant-MailboxType: HOSTED
+X-MS-Exchange-CrossTenant-UserPrincipalName: mt6TZSKYv+lnLPXlQj7hP3NQSiJDZFEbIztaEFvS4u/Ey+jTQS21+Nywl1vdY7TPbl8qS+F2xjqerIF6YU3aJrJY+tEZOUTu7AfUUD4pUl8=
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: SN7PR10MB6473
+X-Proofpoint-Virus-Version: vendor=baseguard
+ engine=ICAP:2.0.254,Aquarius:18.0.957,Hydra:6.0.591,FMLib:17.11.176.26
+ definitions=2023-08-03_22,2023-08-03_01,2023-05-22_02
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 bulkscore=0 phishscore=0 spamscore=0
+ adultscore=0 malwarescore=0 suspectscore=0 mlxscore=0 mlxlogscore=999
+ classifier=spam adjust=0 reason=mlx scancount=1 engine=8.12.0-2306200000
+ definitions=main-2308030184
+X-Proofpoint-GUID: Ai1oZyaQBQimnED3Xzjh2Aq6NHTga79T
+X-Proofpoint-ORIG-GUID: Ai1oZyaQBQimnED3Xzjh2Aq6NHTga79T
+X-Spam-Status: No, score=-12.6 required=5.0 tests=BAYES_00,DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU,DKIM_VALID_EF,GIT_PATCH_0,RCVD_IN_DNSWL_LOW,RCVD_IN_MSPIKE_H5,RCVD_IN_MSPIKE_WL,SPF_HELO_NONE,SPF_NONE,TXREP,T_SCC_BODY_TEXT_LINE autolearn=ham autolearn_force=no version=3.4.6
+X-Spam-Checker-Version: SpamAssassin 3.4.6 (2021-04-09) on server2.sourceware.org
+List-Id: <binutils.sourceware.org>
+
+From: Vladimir Mezentsev <vladimir.mezentsev@oracle.com>
+
+gprofng/ChangeLog
+2023-08-03  Vladimir Mezentsev  <vladimir.mezentsev@oracle.com>
+
+	PR gprofng/30700
+	* testsuite/gprofng.display/gp-collect-app_F.exp: Fix -name argument
+	for sub-experiment filtering.
+--- a/gprofng/testsuite/gprofng.display/gp-collect-app_F.exp
++++ b/gprofng/testsuite/gprofng.display/gp-collect-app_F.exp
+@@ -46,11 +46,11 @@ proc run_gp_collect_app { subExpCnt F_opt } {
+     return -code break
+   }
+ 
+-  set output [run_native_host_cmd "find $tdir -name '*x1.er' | wc -l"]
++  set output [run_native_host_cmd "find $tdir -name '*_x?.er' | wc -l"]
+   set subExp [lindex $output 1]
+   if { $subExp != $subExpCnt } then {
+     set out [lindex $output 1]
+-    send_log "Test failed for -F $F_opt. subExp=$subExp. Shold be $subExpCnt\n"
++    send_log "Test failed for -F $F_opt. subExp=$subExp. Should be $subExpCnt\n"
+     fail $tdir
+     return -code break
+   }
+-- 
+2.31.1

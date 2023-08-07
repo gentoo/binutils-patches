@@ -1,0 +1,36 @@
+https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=b99a9693430a9f04165b1b868f890b622bb1b46c
+https://sourceware.org/PR30699
+
+From b99a9693430a9f04165b1b868f890b622bb1b46c Mon Sep 17 00:00:00 2001
+From: Nick Clifton <nickc@redhat.com>
+Date: Tue, 1 Aug 2023 14:37:04 +0100
+Subject: [PATCH] Fix "--only-keep-debug for ELF relocatables" binutils test
+ for compilers which add .debug_macro sections to object files.
+
+  PR 30699
+  * binutils/testsuite/binutils-all/objcopy.exp (keep_debug_symbols_for_elf_relocatable): Do not add sections containing the string "debug_" to the list of non-debug sections.
+--- a/binutils/testsuite/binutils-all/objcopy.exp
++++ b/binutils/testsuite/binutils-all/objcopy.exp
+@@ -1028,7 +1028,11 @@ proc keep_debug_symbols_for_elf_relocatable { prog flags test } {
+ 	    {[^a-zA-Z]+([a-zA-Z0-9_\.]+)[ \t]+([A-Z]+)[ \t]+[0-9a-f]+ [0-9a-f]+ [0-9a-f]+ [0-9]+[ \t]+([A-Z]*)[ \t]+[0-9]+(.*)} \
+ 	    $got all name type flag rest] } {
+ 	if { $type != "NOTE" && [regexp {[AG]} $flag] } {
+-	    lappend non_debug_sections $name
++	    # PR 30699: Some debug sections can be in a group, so
++	    # exclude sections whose name includes "debug_"
++	    if { ! [regexp {debug_} $name] } {
++		lappend non_debug_sections $name
++	    }
+ 	}
+ 	set got $rest
+     }
+@@ -1086,6 +1090,7 @@ switch [copy_setup] {
+ 	untested $test5
+ 	if [is_elf_format] {
+ 	    untested $test6
++	    untested $test7
+ 	}
+     }
+     "3" {
+-- 
+2.39.3

@@ -1,0 +1,20 @@
+https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=e34acfce343d53290e72c317213a28327bc52fb0
+
+From e34acfce343d53290e72c317213a28327bc52fb0 Mon Sep 17 00:00:00 2001
+From: Tom de Vries <tdevries@suse.de>
+Date: Thu, 3 Aug 2023 09:48:39 +0100
+Subject: [PATCH]  Fix Wlto-type-mismatch in opcodes/ft32-dis.c
+
+--- a/opcodes/ft32-dis.c
++++ b/opcodes/ft32-dis.c
+@@ -27,7 +27,7 @@
+ #include "opcode/ft32.h"
+ #include "disassemble.h"
+ 
+-extern const ft32_opc_info_t ft32_opc_info[128];
++extern const ft32_opc_info_t ft32_opc_info[];
+ 
+ static fprintf_ftype fpr;
+ static void *stream;
+-- 
+2.39.3
