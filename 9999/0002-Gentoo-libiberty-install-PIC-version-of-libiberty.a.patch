@@ -1,4 +1,4 @@
-From 68b7e6f60dd42159af779d5b475b7df553655d1f Mon Sep 17 00:00:00 2001
+From 1156f7b2f690654cf5810ef1e34791d18d207a9f Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Fri, 7 Jan 2005 00:15:53 -0500
 Subject: [PATCH 2/7] Gentoo: libiberty: install PIC version of libiberty.a
@@ -30,5 +30,5 @@ index f9fbba23e2c..d37488d1bf8 100644
  	else true; fi; \
  	if [ x"$(NOASANFLAG)" != x ]; then \
 -- 
-2.41.0
+2.42.0
 

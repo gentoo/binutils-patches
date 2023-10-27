@@ -1,4 +1,4 @@
-From 4718611dc4145a8d8de7534f150053c5accf96a1 Mon Sep 17 00:00:00 2001
+From 9bf3571ddf788d8986d1e45d54df356867bd23d9 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 31 Jul 2021 01:18:18 +0200
 Subject: [PATCH 6/7] Gentoo: XFAIL 15 broken ld.gold tests
@@ -73,5 +73,5 @@ index fb0eb12553b..b506a7f8da7 100644
  AUTOMAKE_OPTIONS = foreign -Wno-portability
  
 -- 
-2.41.0
+2.42.0
 

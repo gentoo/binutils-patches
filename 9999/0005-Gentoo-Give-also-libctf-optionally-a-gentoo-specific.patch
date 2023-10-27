@@ -1,4 +1,4 @@
-From 1de1744597aa5b2e29ddedfea42cd7f99796b0ec Mon Sep 17 00:00:00 2001
+From a0e9a882db04d45bf878b746a8a30c5e51619d8b Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 24 Jul 2021 15:20:16 +0200
 Subject: [PATCH 5/7] Gentoo: Give also libctf optionally a gentoo-specific
@@ -7,9 +7,9 @@ Subject: [PATCH 5/7] Gentoo: Give also libctf optionally a gentoo-specific
 ---
  libctf/Makefile.am  | 14 +++++++++++++-
  libctf/Makefile.in  |  9 ++++++++-
- libctf/configure    | 35 +++++++++++++++++++++++++++++++++--
+ libctf/configure    | 31 +++++++++++++++++++++++++++++++
  libctf/configure.ac | 10 ++++++++++
- 4 files changed, 64 insertions(+), 4 deletions(-)
+ 4 files changed, 62 insertions(+), 2 deletions(-)
 
 diff --git a/libctf/Makefile.am b/libctf/Makefile.am
 index b1dbc2f6ba4..d282ceb619a 100644
@@ -80,7 +80,7 @@ index 3d2696bcc47..664d6360c47 100644
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c \
 diff --git a/libctf/configure b/libctf/configure
-index a0e40f49a80..356503f689f 100755
+index 4c01c022837..07778d52be4 100755
 --- a/libctf/configure
 +++ b/libctf/configure
 @@ -645,6 +645,10 @@ BUILD_INFO_FALSE
@@ -111,25 +111,7 @@ index a0e40f49a80..356503f689f 100755
  
  Some influential environment variables:
    CC          C compiler command
-@@ -11631,7 +11638,7 @@ else
-   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
-   lt_status=$lt_dlunknown
-   cat > conftest.$ac_ext <<_LT_EOF
--#line 11634 "configure"
-+#line 11641 "configure"
- #include "confdefs.h"
- 
- #if HAVE_DLFCN_H
-@@ -11737,7 +11744,7 @@ else
-   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
-   lt_status=$lt_dlunknown
-   cat > conftest.$ac_ext <<_LT_EOF
--#line 11740 "configure"
-+#line 11747 "configure"
- #include "confdefs.h"
- 
- #if HAVE_DLFCN_H
-@@ -14304,6 +14311,26 @@ else
+@@ -14335,6 +14342,26 @@ else
  fi
  
  
@@ -156,7 +138,7 @@ index a0e40f49a80..356503f689f 100755
  # Similar to GDB_AC_CHECK_BFD.
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
-@@ -15196,6 +15223,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
+@@ -15227,6 +15254,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
    as_fn_error $? "conditional \"ENABLE_LIBCTF_HASH_DEBUGGING\" was never defined.
  Usually this means the macro was only invoked conditionally." "$LINENO" 5
  fi
@@ -189,5 +171,5 @@ index 6a5eade1855..a0e65a4aeda 100644
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
 -- 
-2.41.0
+2.42.0
 

@@ -1,4 +1,4 @@
-From 3a489acb4547c320ba43858ead3586fed34c92b4 Mon Sep 17 00:00:00 2001
+From 411d52402227b6e1a9c779988f6f0fc1e17c6620 Mon Sep 17 00:00:00 2001
 From: Sergei Trofimovich <slyfox@gentoo.org>
 Date: Tue, 20 Jul 2021 21:12:38 +0200
 Subject: [PATCH 3/7] Gentoo: add --with-extra-soversion-suffix= option
@@ -34,7 +34,7 @@ Ported to binutils 2.37 by Andreas K. Hüttel <dilfridge@gentoo.org>
  4 files changed, 29 insertions(+)
 
 diff --git a/bfd/Makefile.am b/bfd/Makefile.am
-index 5c5fdefd3b8..fe26bbf4f0f 100644
+index 378c13198d6..e0fa379ca8e 100644
 --- a/bfd/Makefile.am
 +++ b/bfd/Makefile.am
 @@ -64,6 +64,8 @@ bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
@@ -46,7 +46,7 @@ index 5c5fdefd3b8..fe26bbf4f0f 100644
  # bfd.h goes here, for now
  BFD_H = bfd.h
  
-@@ -976,6 +978,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+@@ -991,6 +993,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
  	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
  	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
  	fi ;\
@@ -57,7 +57,7 @@ index 5c5fdefd3b8..fe26bbf4f0f 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/Makefile.in b/bfd/Makefile.in
-index 4edfedee924..70a2442957e 100644
+index 8d09f6fa4af..d397502bb4d 100644
 --- a/bfd/Makefile.in
 +++ b/bfd/Makefile.in
 @@ -342,6 +342,7 @@ ECHO_T = @ECHO_T@
@@ -68,7 +68,7 @@ index 4edfedee924..70a2442957e 100644
  FGREP = @FGREP@
  GENCAT = @GENCAT@
  GMSGFMT = @GMSGFMT@
-@@ -2435,6 +2436,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+@@ -2454,6 +2455,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
  	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
  	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
  	fi ;\
@@ -79,7 +79,7 @@ index 4edfedee924..70a2442957e 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/configure b/bfd/configure
-index dcb10317390..94a4e39d691 100755
+index f0a07ff675f..2322e9b61cf 100755
 --- a/bfd/configure
 +++ b/bfd/configure
 @@ -695,6 +695,7 @@ WARN_CFLAGS
@@ -107,7 +107,7 @@ index dcb10317390..94a4e39d691 100755
    --with-pkgversion=PKG   Use PKG in the version string in place of "GNU
                            Binutils"
    --with-bugurl=URL       Direct users to URL to report a bug
-@@ -12033,6 +12037,15 @@ fi
+@@ -12064,6 +12068,15 @@ fi
  
  
  
@@ -124,7 +124,7 @@ index dcb10317390..94a4e39d691 100755
  
  # Check whether --with-pkgversion was given.
 diff --git a/bfd/configure.ac b/bfd/configure.ac
-index f044616f4d9..f22a87f8f54 100644
+index d1e7e3a4bf3..48f2d69991c 100644
 --- a/bfd/configure.ac
 +++ b/bfd/configure.ac
 @@ -168,6 +168,13 @@ AC_ARG_WITH(separate-debug-dir,
@@ -142,5 +142,5 @@ index f044616f4d9..f22a87f8f54 100644
  ACX_BUGURL([https://sourceware.org/bugzilla/])
  
 -- 
-2.41.0
+2.42.0
 
