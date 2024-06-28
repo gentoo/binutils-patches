@@ -1,4 +1,4 @@
-From a0e9a882db04d45bf878b746a8a30c5e51619d8b Mon Sep 17 00:00:00 2001
+From a8cf14f5ea0a210928250fd1c47b4e45c39974c5 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 24 Jul 2021 15:20:16 +0200
 Subject: [PATCH 5/7] Gentoo: Give also libctf optionally a gentoo-specific
@@ -12,10 +12,10 @@ Subject: [PATCH 5/7] Gentoo: Give also libctf optionally a gentoo-specific
  4 files changed, 62 insertions(+), 2 deletions(-)
 
 diff --git a/libctf/Makefile.am b/libctf/Makefile.am
-index b1dbc2f6ba4..d282ceb619a 100644
+index fb1a306c888..5fcc73bd04e 100644
 --- a/libctf/Makefile.am
 +++ b/libctf/Makefile.am
-@@ -26,6 +26,9 @@ info_TEXINFOS =
+@@ -31,6 +31,9 @@ info_TEXINFOS =
  DISTCLEANFILES =
  MAINTAINERCLEANFILES =
  
@@ -25,7 +25,7 @@ index b1dbc2f6ba4..d282ceb619a 100644
  # This is where we get zlib from.  zlibdir is -L../zlib and zlibinc is
  # -I../zlib, unless we were configured with --with-system-zlib, in which
  # case both are empty.
-@@ -46,8 +49,17 @@ include_HEADERS =
+@@ -51,8 +54,17 @@ include_HEADERS =
  noinst_LTLIBRARIES = libctf.la libctf-nobfd.la
  endif
  
@@ -45,10 +45,10 @@ index b1dbc2f6ba4..d282ceb619a 100644
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c ctf-decl.c ctf-error.c \
 diff --git a/libctf/Makefile.in b/libctf/Makefile.in
-index 3d2696bcc47..664d6360c47 100644
+index 54f5daa79ee..b7a80edfab6 100644
 --- a/libctf/Makefile.in
 +++ b/libctf/Makefile.in
-@@ -380,6 +380,7 @@ AUTOCONF = @AUTOCONF@
+@@ -430,6 +430,7 @@ AUTOCONF = @AUTOCONF@
  AUTOHEADER = @AUTOHEADER@
  AUTOMAKE = @AUTOMAKE@
  AWK = @AWK@
@@ -56,7 +56,7 @@ index 3d2696bcc47..664d6360c47 100644
  CATALOGS = @CATALOGS@
  CATOBJEXT = @CATOBJEXT@
  CC = @CC@
-@@ -402,6 +403,7 @@ EXEEXT = @EXEEXT@
+@@ -452,6 +453,7 @@ EXEEXT = @EXEEXT@
  
  # Setup the testing framework, if you have one
  EXPECT = expect
@@ -64,7 +64,7 @@ index 3d2696bcc47..664d6360c47 100644
  FGREP = @FGREP@
  GENCAT = @GENCAT@
  GMSGFMT = @GMSGFMT@
-@@ -540,8 +542,13 @@ AM_CFLAGS = -std=gnu99 @ac_libctf_warn_cflags@ @warn@ @c_warn@ @WARN_PEDANTIC@ @
+@@ -603,8 +605,13 @@ AM_CFLAGS = -std=gnu99 @ac_libctf_warn_cflags@ @warn@ @c_warn@ @WARN_PEDANTIC@ @
  @INSTALL_LIBBFD_FALSE@include_HEADERS = 
  @INSTALL_LIBBFD_TRUE@include_HEADERS = $(INCDIR)/ctf.h $(INCDIR)/ctf-api.h
  @INSTALL_LIBBFD_FALSE@noinst_LTLIBRARIES = libctf.la libctf-nobfd.la
@@ -80,10 +80,10 @@ index 3d2696bcc47..664d6360c47 100644
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c \
 diff --git a/libctf/configure b/libctf/configure
-index 4c01c022837..07778d52be4 100755
+index 7466d56a18b..54c86592b70 100755
 --- a/libctf/configure
 +++ b/libctf/configure
-@@ -645,6 +645,10 @@ BUILD_INFO_FALSE
+@@ -646,6 +646,10 @@ BUILD_INFO_FALSE
  BUILD_INFO_TRUE
  NEED_CTF_QSORT_R_FALSE
  NEED_CTF_QSORT_R_TRUE
@@ -94,7 +94,7 @@ index 4c01c022837..07778d52be4 100755
  ENABLE_LIBCTF_HASH_DEBUGGING_FALSE
  ENABLE_LIBCTF_HASH_DEBUGGING_TRUE
  zlibinc
-@@ -806,6 +810,7 @@ enable_maintainer_mode
+@@ -821,6 +825,7 @@ enable_maintainer_mode
  enable_install_libbfd
  with_system_zlib
  enable_libctf_hash_debugging
@@ -102,7 +102,7 @@ index 4c01c022837..07778d52be4 100755
  '
        ac_precious_vars='build_alias
  host_alias
-@@ -1463,6 +1468,8 @@ Optional Packages:
+@@ -1487,6 +1492,8 @@ Optional Packages:
                            both]
    --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
    --with-system-zlib      use installed libz
@@ -111,7 +111,7 @@ index 4c01c022837..07778d52be4 100755
  
  Some influential environment variables:
    CC          C compiler command
-@@ -14335,6 +14342,26 @@ else
+@@ -16274,6 +16281,26 @@ else
  fi
  
  
@@ -138,7 +138,7 @@ index 4c01c022837..07778d52be4 100755
  # Similar to GDB_AC_CHECK_BFD.
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
-@@ -15227,6 +15254,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
+@@ -17177,6 +17204,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
    as_fn_error $? "conditional \"ENABLE_LIBCTF_HASH_DEBUGGING\" was never defined.
  Usually this means the macro was only invoked conditionally." "$LINENO" 5
  fi
@@ -150,7 +150,7 @@ index 4c01c022837..07778d52be4 100755
  if test -z "${NEED_CTF_QSORT_R_TRUE}" && test -z "${NEED_CTF_QSORT_R_FALSE}"; then
    as_fn_error $? "conditional \"NEED_CTF_QSORT_R\" was never defined.
 diff --git a/libctf/configure.ac b/libctf/configure.ac
-index 6a5eade1855..a0e65a4aeda 100644
+index 64544b83a9f..1ce43327c25 100644
 --- a/libctf/configure.ac
 +++ b/libctf/configure.ac
 @@ -76,6 +76,16 @@ if test "${enable_libctf_hash_debugging}" = yes; then
@@ -171,5 +171,5 @@ index 6a5eade1855..a0e65a4aeda 100644
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
 -- 
-2.42.0
+2.44.2
 

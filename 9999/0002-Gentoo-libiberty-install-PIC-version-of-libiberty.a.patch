@@ -1,4 +1,4 @@
-From 1156f7b2f690654cf5810ef1e34791d18d207a9f Mon Sep 17 00:00:00 2001
+From 1594a93229b13d3c34c679e5991e64663cace1b9 Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Fri, 7 Jan 2005 00:15:53 -0500
 Subject: [PATCH 2/7] Gentoo: libiberty: install PIC version of libiberty.a
@@ -18,7 +18,7 @@ general are fairly low, and we'd rather have things work for all of them.
  1 file changed, 1 insertion(+)
 
 diff --git a/libiberty/Makefile.in b/libiberty/Makefile.in
-index f9fbba23e2c..d37488d1bf8 100644
+index b77a41c781c..5e3725d16ff 100644
 --- a/libiberty/Makefile.in
 +++ b/libiberty/Makefile.in
 @@ -258,6 +258,7 @@ $(TARGETLIB): $(REQUIRED_OFILES) $(EXTRA_OFILES) $(LIBOBJS)
@@ -30,5 +30,5 @@ index f9fbba23e2c..d37488d1bf8 100644
  	else true; fi; \
  	if [ x"$(NOASANFLAG)" != x ]; then \
 -- 
-2.42.0
+2.44.2
 

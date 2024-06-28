@@ -1,4 +1,4 @@
-From 9bf3571ddf788d8986d1e45d54df356867bd23d9 Mon Sep 17 00:00:00 2001
+From d826b80fe902aefd77465be3650ab2d62af5e099 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 31 Jul 2021 01:18:18 +0200
 Subject: [PATCH 6/7] Gentoo: XFAIL 15 broken ld.gold tests
@@ -16,7 +16,7 @@ Bug: https://sourceware.org/bugzilla/show_bug.cgi?id=27303
  2 files changed, 18 insertions(+), 4 deletions(-)
 
 diff --git a/gold/testsuite/Makefile.am b/gold/testsuite/Makefile.am
-index df9405c1aac..749921633b2 100644
+index 2f1348fd6e2..1206460f191 100644
 --- a/gold/testsuite/Makefile.am
 +++ b/gold/testsuite/Makefile.am
 @@ -1,5 +1,11 @@
@@ -32,7 +32,7 @@ index df9405c1aac..749921633b2 100644
  # system and the host system are the same.  So these tests will not
  # work when building with a cross-compiler.
 diff --git a/gold/testsuite/Makefile.in b/gold/testsuite/Makefile.in
-index fb0eb12553b..b506a7f8da7 100644
+index 9cf21df8d7d..df14333c558 100644
 --- a/gold/testsuite/Makefile.in
 +++ b/gold/testsuite/Makefile.in
 @@ -15,10 +15,6 @@
@@ -61,7 +61,7 @@ index fb0eb12553b..b506a7f8da7 100644
  check_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
  	$(am__EXEEXT_4) $(am__EXEEXT_5) $(am__EXEEXT_6) \
  	$(am__EXEEXT_7) $(am__EXEEXT_8) $(am__EXEEXT_9) \
-@@ -2759,6 +2763,10 @@ top_srcdir = @top_srcdir@
+@@ -2782,6 +2786,10 @@ top_srcdir = @top_srcdir@
  zlibdir = @zlibdir@
  zlibinc = @zlibinc@
  
@@ -73,5 +73,5 @@ index fb0eb12553b..b506a7f8da7 100644
  AUTOMAKE_OPTIONS = foreign -Wno-portability
  
 -- 
-2.42.0
+2.44.2
 

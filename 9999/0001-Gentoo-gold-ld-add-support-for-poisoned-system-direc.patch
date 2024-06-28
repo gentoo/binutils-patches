@@ -1,4 +1,4 @@
-From 7b47d0be518ef97bb5259a5dbb70d6b3f22011f6 Mon Sep 17 00:00:00 2001
+From 68b26b5bf2047d71fac89ee321c0f9231c85903e Mon Sep 17 00:00:00 2001
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Tue, 20 Jul 2021 21:08:31 +0200
 Subject: [PATCH 1/7] Gentoo: gold/ld: add support for poisoned system
@@ -44,7 +44,7 @@ Ported to binutils 2.39 by WANG Xuerui <xen0n@gentoo.org>
  11 files changed, 148 insertions(+)
 
 diff --git a/gold/options.cc b/gold/options.cc
-index c9834b66159..bd3e948a61b 100644
+index 46f067fa72f..a07ba1c82ed 100644
 --- a/gold/options.cc
 +++ b/gold/options.cc
 @@ -1355,6 +1355,39 @@ General_options::finalize()
@@ -88,7 +88,7 @@ index c9834b66159..bd3e948a61b 100644
    if (this->shared() && this->is_static())
      gold_fatal(_("-shared and -static are incompatible"));
 diff --git a/gold/options.h b/gold/options.h
-index 46f658f23ea..8f9b8c177ad 100644
+index 446e8d42614..464863b45fa 100644
 --- a/gold/options.h
 +++ b/gold/options.h
 @@ -1402,6 +1402,13 @@ class General_options
@@ -106,10 +106,10 @@ index 46f658f23ea..8f9b8c177ad 100644
  	      N_("Warn when skipping an incompatible library"),
  	      N_("Don't warn when skipping an incompatible library"));
 diff --git a/ld/config.in b/ld/config.in
-index a453c7f7241..a0bc2a56013 100644
+index f7c9da3d02a..e4fdbf6db5b 100644
 --- a/ld/config.in
 +++ b/ld/config.in
-@@ -58,6 +58,9 @@
+@@ -74,6 +74,9 @@
     language is requested. */
  #undef ENABLE_NLS
  
@@ -120,10 +120,10 @@ index a453c7f7241..a0bc2a56013 100644
  #undef EXTRA_SHLIB_EXTENSION
  
 diff --git a/ld/configure b/ld/configure
-index d2cdf256b89..0f32e98bc34 100755
+index 4e8de840418..f6d3069133e 100755
 --- a/ld/configure
 +++ b/ld/configure
-@@ -838,6 +838,7 @@ with_lib_path
+@@ -844,6 +844,7 @@ with_lib_path
  enable_targets
  enable_64_bit_bfd
  with_sysroot
@@ -131,7 +131,7 @@ index d2cdf256b89..0f32e98bc34 100755
  enable_gold
  enable_got
  enable_compressed_debug_sections
-@@ -1520,6 +1521,8 @@ Optional Features:
+@@ -1535,6 +1536,8 @@ Optional Features:
    --enable-checking       enable run-time checks
    --enable-targets        alternative target configurations
    --enable-64-bit-bfd     64-bit support (on hosts with narrower word sizes)
@@ -140,7 +140,7 @@ index d2cdf256b89..0f32e98bc34 100755
    --enable-gold[=ARG]     build gold [ARG={default,yes,no}]
    --enable-got=<type>     GOT handling scheme (target, single, negative,
                            multigot)
-@@ -15538,6 +15541,19 @@ fi
+@@ -15566,6 +15569,19 @@ fi
  
  
  
@@ -161,10 +161,10 @@ index d2cdf256b89..0f32e98bc34 100755
  if test "${enable_gold+set}" = set; then :
    enableval=$enable_gold; case "${enableval}" in
 diff --git a/ld/configure.ac b/ld/configure.ac
-index c3ebd3ec7e4..71790d7640f 100644
+index bdf51a062fa..3d370ff92ce 100644
 --- a/ld/configure.ac
 +++ b/ld/configure.ac
-@@ -103,6 +103,16 @@ AC_SUBST(use_sysroot)
+@@ -102,6 +102,16 @@ AC_SUBST(use_sysroot)
  AC_SUBST(TARGET_SYSTEM_ROOT)
  AC_SUBST(TARGET_SYSTEM_ROOT_DEFINE)
  
@@ -182,10 +182,10 @@ index c3ebd3ec7e4..71790d7640f 100644
  dnl "install_as_default" is set to false if gold is the default linker.
  dnl "installed_linker" is the installed BFD linker name.
 diff --git a/ld/ld.h b/ld/ld.h
-index a0f8a15c7a9..69420b6673a 100644
+index 0dee944cf2a..a2bb9a10993 100644
 --- a/ld/ld.h
 +++ b/ld/ld.h
-@@ -163,6 +163,13 @@ typedef struct
+@@ -166,6 +166,13 @@ typedef struct
       in the linker script.  */
    bool force_group_allocation;
  
@@ -200,10 +200,10 @@ index a0f8a15c7a9..69420b6673a 100644
    enum endian_enum endian;
  
 diff --git a/ld/ld.texi b/ld/ld.texi
-index 1f56ded1041..1fa6bf7b225 100644
+index 89e3913317a..cd16eb9685e 100644
 --- a/ld/ld.texi
 +++ b/ld/ld.texi
-@@ -3070,6 +3070,24 @@ creation of the metadata note, if one had been enabled by an earlier
+@@ -3245,6 +3245,24 @@ creation of the metadata note, if one had been enabled by an earlier
  occurrence of the --package-metadata option.
  If the linker has been built with libjansson, then the JSON string
  will be validated.
@@ -229,15 +229,14 @@ index 1f56ded1041..1fa6bf7b225 100644
  
  @c man end
 diff --git a/ld/ldfile.c b/ld/ldfile.c
-index 8f869c1f19e..ee9d4bccee2 100644
+index 87be885d31a..469ab52f985 100644
 --- a/ld/ldfile.c
 +++ b/ld/ldfile.c
-@@ -327,6 +327,26 @@ ldfile_add_library_path (const char *name, bool cmdline)
-     new_dirs->name = concat (ld_sysroot, name + strlen ("$SYSROOT"), (const char *) NULL);
-   else
-     new_dirs->name = xstrdup (name);
-+
-+  if (command_line.warn_poison_system_directories
+@@ -344,6 +344,26 @@ ldfile_add_library_path (const char *name, enum search_dir_source source)
+       search_tail_ptr = &new_dirs->next;
+     }
+ 
++ if (command_line.warn_poison_system_directories
 +      && (!strncmp (name, "/lib", 4)
 +      /* TODO: This check is disabled for now due to a bunch of packages that
 +       * use libtool and relink with -L/usr/lib paths (albeit after the right
@@ -245,25 +244,26 @@ index 8f869c1f19e..ee9d4bccee2 100644
 +       * We also need to adjust it so it only rejects one or two levels deep.
 +       * Gcc's internal paths also live below /usr/lib.
 +       * http://crbug.com/488360  */
-+	  /* || !strncmp (name, "/usr/lib", 8) */
-+	  || !strncmp (name, "/usr/local/lib", 14)
-+	  || !strncmp (name, "/usr/X11R6/lib", 14)))
++       /* || !strncmp (name, "/usr/lib", 8) */
++          || !strncmp (name, "/usr/local/lib", 14)
++          || !strncmp (name, "/usr/X11R6/lib", 14)))
 +    {
 +      if (command_line.error_poison_system_directories)
-+	einfo (_("%X%P: error: library search path \"%s\" is unsafe for "
-+	         "cross-compilation\n"), name);
++        einfo (_("%X%P: error: library search path \"%s\" is unsafe for "
++                 "cross-compilation\n"), name);
 +      else
-+	einfo (_("%P: warning: library search path \"%s\" is unsafe for "
-+	         "cross-compilation\n"), name);
++        einfo (_("%P: warning: library search path \"%s\" is unsafe for "
++                 "cross-compilation\n"), name);
 +    }
++
+   return new_dirs;
  }
  
- /* Try to open a BFD for a lang_input_statement.  */
 diff --git a/ld/ldlex.h b/ld/ldlex.h
-index 87cac02141d..d79ec8faa15 100644
+index defe3fcbbb9..ab94487edc6 100644
 --- a/ld/ldlex.h
 +++ b/ld/ldlex.h
-@@ -151,6 +151,9 @@ enum option_values
+@@ -153,6 +153,9 @@ enum option_values
    OPTION_PRINT_OUTPUT_FORMAT,
    OPTION_PRINT_SYSROOT,
    OPTION_IGNORE_UNRESOLVED_SYMBOL,
@@ -274,10 +274,10 @@ index 87cac02141d..d79ec8faa15 100644
    OPTION_POP_STATE,
    OPTION_DISABLE_MULTIPLE_DEFS_ABS,
 diff --git a/ld/ldmain.c b/ld/ldmain.c
-index 06ac2c64fa8..5ec931a0255 100644
+index 037099b9d37..552a191a857 100644
 --- a/ld/ldmain.c
 +++ b/ld/ldmain.c
-@@ -325,6 +325,13 @@ main (int argc, char **argv)
+@@ -347,6 +347,13 @@ main (int argc, char **argv)
    command_line.warn_mismatch = true;
    command_line.warn_search_mismatch = true;
    command_line.check_section_addresses = -1;
@@ -292,10 +292,10 @@ index 06ac2c64fa8..5ec931a0255 100644
    /* We initialize DEMANGLING based on the environment variable
       COLLECT_NO_DEMANGLE.  The gcc collect2 program will demangle the
 diff --git a/ld/lexsup.c b/ld/lexsup.c
-index 49dfc13382a..b2d1d967aa0 100644
+index 4aa0124ce2f..e8e28ac7ea4 100644
 --- a/ld/lexsup.c
 +++ b/ld/lexsup.c
-@@ -594,6 +594,18 @@ static const struct ld_option ld_options[] =
+@@ -613,6 +613,18 @@ static const struct ld_option ld_options[] =
      OPTION_IGNORE_UNRESOLVED_SYMBOL},
      '\0', N_("SYMBOL"),
      N_("Unresolved SYMBOL will not cause an error or warning"), TWO_DASHES },
@@ -314,7 +314,7 @@ index 49dfc13382a..b2d1d967aa0 100644
    { {"push-state", no_argument, NULL, OPTION_PUSH_STATE},
      '\0', NULL, N_("Push state of flags governing input file handling"),
      TWO_DASHES },
-@@ -1738,6 +1750,18 @@ parse_args (unsigned argc, char **argv)
+@@ -1785,6 +1797,18 @@ parse_args (unsigned argc, char **argv)
  	  }
  	  break;
  
@@ -334,5 +334,5 @@ index 49dfc13382a..b2d1d967aa0 100644
  	  input_flags.pushed = xmemdup (&input_flags,
  					sizeof (input_flags),
 -- 
-2.42.0
+2.44.2
 
