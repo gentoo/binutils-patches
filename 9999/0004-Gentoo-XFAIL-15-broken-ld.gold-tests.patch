@@ -1,7 +1,7 @@
-From d826b80fe902aefd77465be3650ab2d62af5e099 Mon Sep 17 00:00:00 2001
+From 942b4489226184460d46eb9e7450eb63a1885621 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 31 Jul 2021 01:18:18 +0200
-Subject: [PATCH 6/7] Gentoo: XFAIL 15 broken ld.gold tests
+Subject: [PATCH 4/5] Gentoo: XFAIL 15 broken ld.gold tests
 
 It seems like either the tests or ld.gold in general cannot handle
 compilers built with --enable-default-pie. No fix yet, so let's ignore

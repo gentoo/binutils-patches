@@ -1,7 +1,7 @@
-From bbaa9fafb08385e5ad836bc30a2db3af47d1cc5a Mon Sep 17 00:00:00 2001
+From 24694fe84ea1ac172f709bd1b079ebb996e4feb9 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Wed, 22 Feb 2023 20:05:35 +0100
-Subject: [PATCH 7/7] Apply a similar libiberty fix as in 7d53105d for
+Subject: [PATCH 5/5] Apply a similar libiberty fix as in 7d53105d for
  libopcodes and libgprofng
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -46,7 +46,7 @@ index cef4b275305..295fd3ee2df 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/opcodes/configure b/opcodes/configure
-index 050fd5ff0ff..4b68211dea6 100755
+index 0075b6dc0ef..76fca3e9246 100755
 --- a/opcodes/configure
 +++ b/opcodes/configure
 @@ -14379,10 +14379,10 @@ if test "$enable_shared" = "yes"; then

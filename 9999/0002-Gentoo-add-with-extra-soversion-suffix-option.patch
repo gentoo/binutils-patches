@@ -1,7 +1,7 @@
-From 6d6cbf2ede96fd65bd7a9382c3364aaa9d0ac3bb Mon Sep 17 00:00:00 2001
+From 87a5dd82a8e08967694943e866aa9b26c4fc6a63 Mon Sep 17 00:00:00 2001
 From: Sergei Trofimovich <slyfox@gentoo.org>
 Date: Tue, 20 Jul 2021 21:12:38 +0200
-Subject: [PATCH 3/7] Gentoo: add --with-extra-soversion-suffix= option
+Subject: [PATCH 2/5] Gentoo: add --with-extra-soversion-suffix= option
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -79,7 +79,7 @@ index b3d97d478ea..38209d1b234 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/configure b/bfd/configure
-index 6458974951e..b43789851cd 100755
+index 83cb19c7015..a60c76319b9 100755
 --- a/bfd/configure
 +++ b/bfd/configure
 @@ -701,6 +701,7 @@ WARN_CFLAGS
