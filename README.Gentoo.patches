@@ -3,7 +3,7 @@
  ============
 
 Gentoo patchsets for binutils are maintained as vendor branches of the upstream
-binutils-glb git repository. From there, we bundle all the commits into a tarball
+binutils-gdb git repository. From there, we bundle all the commits into a tarball
 and distribute it via our public mirroring system.
 
 If you want specific info about a patch (like what it does or whose great idea 
