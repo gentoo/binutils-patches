@@ -1,19 +1,13 @@
-From 35123215fe882c439955a644a715b23d31c4174d Mon Sep 17 00:00:00 2001
-Message-ID: <35123215fe882c439955a644a715b23d31c4174d.1734739720.git.sam@gentoo.org>
+From 6bb8e5ad25557fc476ccc64ee925d9c1d199a39a Mon Sep 17 00:00:00 2001
+Message-ID: <6bb8e5ad25557fc476ccc64ee925d9c1d199a39a.1735021582.git.sam@gentoo.org>
+In-Reply-To: <423c670c7d80a334fb9f10b71dcc68c022c2a2a5.1735021582.git.sam@gentoo.org>
+References: <423c670c7d80a334fb9f10b71dcc68c022c2a2a5.1735021582.git.sam@gentoo.org>
 From: Sam James <sam@gentoo.org>
-Date: Sat, 21 Dec 2024 00:07:29 +0000
-Subject: [PATCH] Revert "Fix the handling or arguments and macro
+Date: Tue, 24 Dec 2024 06:26:16 +0000
+Subject: [PATCH 3/3] Revert "Fix the handling or arguments and macro
  pseudo-variables inside nested assembler macros."
 
 This reverts commit 9f2e3c21f6506f081f1360f02b847606e0e00995.
-
-Breaks kernel build on amd64 and some multimedia bits on arm*, revert
-for now.
-
-Bug: https://sourceware.org/PR32484
-Bug: https://sourceware.org/PR32486
-Bug: https://sourceware.org/PR32487
-Signed-off-by: Sam James <sam@gentoo.org>
 ---
  gas/config/tc-iq2000.c              |   6 +-
  gas/doc/as.texi                     |  60 +------
@@ -901,8 +895,6 @@ index 438d5af8d00..00000000000
 -.endm
 -
 -OUTER fred, jim, harry\arg4 /* This produces references to "jim", "bert" and "harryfred".  */
-
-base-commit: 14848fc2b22e6e718abadcfbcc0491688df19a8e
 -- 
 2.47.1
 

@@ -1,0 +1,39 @@
+From bbdfc672d363ee12f00ce6fc6c7660032cdf4f88 Mon Sep 17 00:00:00 2001
+Message-ID: <bbdfc672d363ee12f00ce6fc6c7660032cdf4f88.1735021582.git.sam@gentoo.org>
+In-Reply-To: <423c670c7d80a334fb9f10b71dcc68c022c2a2a5.1735021582.git.sam@gentoo.org>
+References: <423c670c7d80a334fb9f10b71dcc68c022c2a2a5.1735021582.git.sam@gentoo.org>
+From: Sam James <sam@gentoo.org>
+Date: Tue, 24 Dec 2024 06:25:57 +0000
+Subject: [PATCH 2/3] Revert "Fix error: macro may be used uninitialized"
+
+This reverts commit f404dc565a4ccfe6922b45cf5526c319aedf75d6.
+---
+ gas/macro.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/gas/macro.c b/gas/macro.c
+index 3d5a9f14341..a0f2a5c764c 100644
+--- a/gas/macro.c
++++ b/gas/macro.c
+@@ -1411,6 +1411,7 @@ check_macro (const char *line, sb *expand,
+ {
+   const char *s;
+   char *copy, *cls;
++  macro_entry *macro;
+   sb line_sb;
+ 
+   if (! macros_defined)
+@@ -1430,8 +1431,8 @@ check_macro (const char *line, sb *expand,
+   for (cls = copy; *cls != '\0'; cls ++)
+     *cls = TOLOWER (*cls);
+ 
+-  macro_entry *macro = NULL;
+-  for (int i = macro_nesting_depth; i >= 0; i--)
++  int i;
++  for (i = macro_nesting_depth; i >= 0; i--)
+     {
+       macro = str_hash_find (macro_hash[i], copy);
+       if (macro != NULL)
+-- 
+2.47.1
+
