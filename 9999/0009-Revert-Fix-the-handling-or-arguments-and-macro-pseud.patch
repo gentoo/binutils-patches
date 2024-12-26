@@ -1,10 +1,10 @@
-From 6bb8e5ad25557fc476ccc64ee925d9c1d199a39a Mon Sep 17 00:00:00 2001
-Message-ID: <6bb8e5ad25557fc476ccc64ee925d9c1d199a39a.1735021582.git.sam@gentoo.org>
-In-Reply-To: <423c670c7d80a334fb9f10b71dcc68c022c2a2a5.1735021582.git.sam@gentoo.org>
-References: <423c670c7d80a334fb9f10b71dcc68c022c2a2a5.1735021582.git.sam@gentoo.org>
+From 499b2dbc38cbd668b62704165ee572c6ab784a4e Mon Sep 17 00:00:00 2001
+Message-ID: <499b2dbc38cbd668b62704165ee572c6ab784a4e.1735175975.git.sam@gentoo.org>
+In-Reply-To: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
+References: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
 From: Sam James <sam@gentoo.org>
 Date: Tue, 24 Dec 2024 06:26:16 +0000
-Subject: [PATCH 3/3] Revert "Fix the handling or arguments and macro
+Subject: [PATCH 4/4] Revert "Fix the handling or arguments and macro
  pseudo-variables inside nested assembler macros."
 
 This reverts commit 9f2e3c21f6506f081f1360f02b847606e0e00995.

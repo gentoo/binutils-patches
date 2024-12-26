@@ -1,0 +1,38 @@
+From a6aac087c94bab6335335e24aa9ab58ce0682859 Mon Sep 17 00:00:00 2001
+Message-ID: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
+From: Sam James <sam@gentoo.org>
+Date: Thu, 26 Dec 2024 01:15:13 +0000
+Subject: [PATCH 1/4] Revert "macro.c:871 heap-buffer-overflow"
+
+This reverts commit 6d9b7667974372357fed1f02c54a805f8c21dcde.
+---
+ gas/macro.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gas/macro.c b/gas/macro.c
+index ded0645be8d..3d5a9f14341 100644
+--- a/gas/macro.c
++++ b/gas/macro.c
+@@ -868,7 +868,7 @@ sub_actual (size_t start, sb *in, sb *t, struct htab *formal_hash,
+ 	  /* The parent's FORMALs might contain parameters that need further
+ 	     substitution.  See gas/testsuite/gas/arm/macro-vld1.s for an
+ 	     example of this.  */
+-	  if (memchr (add->ptr, '\\', add->len))
++	  if (strchr (add->ptr, '\\'))
+ 	    {
+ 	      sb newadd;
+ 
+@@ -1485,7 +1485,7 @@ delete_macro (const char *name)
+ 	}
+     }
+ 
+-  if (j < 0)
++  if (macro == NULL)
+     as_warn (_("Attempt to purge non-existing macro `%s'"), copy);
+ 
+   free (copy);
+
+base-commit: fa93e88f754e10dfb60dd4c9bf9cef858d4c7e4a
+-- 
+2.47.1
+

@@ -1,10 +1,10 @@
-From bbdfc672d363ee12f00ce6fc6c7660032cdf4f88 Mon Sep 17 00:00:00 2001
-Message-ID: <bbdfc672d363ee12f00ce6fc6c7660032cdf4f88.1735021582.git.sam@gentoo.org>
-In-Reply-To: <423c670c7d80a334fb9f10b71dcc68c022c2a2a5.1735021582.git.sam@gentoo.org>
-References: <423c670c7d80a334fb9f10b71dcc68c022c2a2a5.1735021582.git.sam@gentoo.org>
+From cc2fcd3f83d79ca491c61654b94e267386cdab3a Mon Sep 17 00:00:00 2001
+Message-ID: <cc2fcd3f83d79ca491c61654b94e267386cdab3a.1735175975.git.sam@gentoo.org>
+In-Reply-To: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
+References: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
 From: Sam James <sam@gentoo.org>
 Date: Tue, 24 Dec 2024 06:25:57 +0000
-Subject: [PATCH 2/3] Revert "Fix error: macro may be used uninitialized"
+Subject: [PATCH 3/4] Revert "Fix error: macro may be used uninitialized"
 
 This reverts commit f404dc565a4ccfe6922b45cf5526c319aedf75d6.
 ---
