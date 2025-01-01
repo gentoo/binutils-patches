@@ -1,10 +1,10 @@
-From cc2fcd3f83d79ca491c61654b94e267386cdab3a Mon Sep 17 00:00:00 2001
-Message-ID: <cc2fcd3f83d79ca491c61654b94e267386cdab3a.1735175975.git.sam@gentoo.org>
-In-Reply-To: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
-References: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
+From 44100045e8d1df5df3578d60206df94498bcd236 Mon Sep 17 00:00:00 2001
+Message-ID: <44100045e8d1df5df3578d60206df94498bcd236.1735740264.git.sam@gentoo.org>
+In-Reply-To: <4bed21d47f9d838dc6b55ce026989ede4eacc789.1735740264.git.sam@gentoo.org>
+References: <4bed21d47f9d838dc6b55ce026989ede4eacc789.1735740264.git.sam@gentoo.org>
 From: Sam James <sam@gentoo.org>
-Date: Tue, 24 Dec 2024 06:25:57 +0000
-Subject: [PATCH 3/4] Revert "Fix error: macro may be used uninitialized"
+Date: Wed, 1 Jan 2025 14:03:46 +0000
+Subject: [PATCH 09/10] Revert "Fix error: macro may be used uninitialized"
 
 This reverts commit f404dc565a4ccfe6922b45cf5526c319aedf75d6.
 ---
@@ -12,7 +12,7 @@ This reverts commit f404dc565a4ccfe6922b45cf5526c319aedf75d6.
  1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/gas/macro.c b/gas/macro.c
-index 3d5a9f14341..a0f2a5c764c 100644
+index 5fa2011ab7a..c1b43e76a61 100644
 --- a/gas/macro.c
 +++ b/gas/macro.c
 @@ -1411,6 +1411,7 @@ check_macro (const char *line, sb *expand,

@@ -1,0 +1,28 @@
+From 4bed21d47f9d838dc6b55ce026989ede4eacc789 Mon Sep 17 00:00:00 2001
+Message-ID: <4bed21d47f9d838dc6b55ce026989ede4eacc789.1735740264.git.sam@gentoo.org>
+From: Sam James <sam@gentoo.org>
+Date: Wed, 1 Jan 2025 14:03:43 +0000
+Subject: [PATCH 06/10] Revert "PR 32391 memory leak"
+
+This reverts commit 599739cc1c5d70ac958583130b4b5413aa101d8e.
+---
+ gas/macro.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/gas/macro.c b/gas/macro.c
+index 9eefc8360b1..9670b38c152 100644
+--- a/gas/macro.c
++++ b/gas/macro.c
+@@ -878,7 +878,6 @@ sub_actual (size_t start, sb *in, sb *t, struct htab *formal_hash,
+ 	      (void) macro_expand_body (add, &newadd, NULL, NULL,
+ 					orig_macro, orig_macro->count);
+ 	      sb_add_sb (out, &newadd);
+-	      sb_kill (&newadd);
+ 	    }
+ 	  else
+ 	    {
+
+base-commit: 94e2b2a770fc49e42c9baec80f4fb88f63391a4e
+-- 
+2.47.1
+

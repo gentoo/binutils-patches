@@ -1,10 +1,10 @@
-From 499b2dbc38cbd668b62704165ee572c6ab784a4e Mon Sep 17 00:00:00 2001
-Message-ID: <499b2dbc38cbd668b62704165ee572c6ab784a4e.1735175975.git.sam@gentoo.org>
-In-Reply-To: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
-References: <a6aac087c94bab6335335e24aa9ab58ce0682859.1735175975.git.sam@gentoo.org>
+From cfb2c161d55d2a4ab5ab3729b16ad364c8ec1c3f Mon Sep 17 00:00:00 2001
+Message-ID: <cfb2c161d55d2a4ab5ab3729b16ad364c8ec1c3f.1735740264.git.sam@gentoo.org>
+In-Reply-To: <4bed21d47f9d838dc6b55ce026989ede4eacc789.1735740264.git.sam@gentoo.org>
+References: <4bed21d47f9d838dc6b55ce026989ede4eacc789.1735740264.git.sam@gentoo.org>
 From: Sam James <sam@gentoo.org>
-Date: Tue, 24 Dec 2024 06:26:16 +0000
-Subject: [PATCH 4/4] Revert "Fix the handling or arguments and macro
+Date: Wed, 1 Jan 2025 14:03:46 +0000
+Subject: [PATCH 10/10] Revert "Fix the handling or arguments and macro
  pseudo-variables inside nested assembler macros."
 
 This reverts commit 9f2e3c21f6506f081f1360f02b847606e0e00995.
@@ -23,7 +23,7 @@ This reverts commit 9f2e3c21f6506f081f1360f02b847606e0e00995.
  delete mode 100644 gas/testsuite/gas/macros/nesting.s
 
 diff --git a/gas/config/tc-iq2000.c b/gas/config/tc-iq2000.c
-index 1cbc578281f..2198ffda2b9 100644
+index 8dc3b768e3a..c65f264528f 100644
 --- a/gas/config/tc-iq2000.c
 +++ b/gas/config/tc-iq2000.c
 @@ -105,6 +105,8 @@ struct iq2000_hi_fixup
@@ -47,7 +47,7 @@ index 1cbc578281f..2198ffda2b9 100644
  
  static void
 diff --git a/gas/doc/as.texi b/gas/doc/as.texi
-index 1683594a0bb..6be54b57599 100644
+index 69d6d3c88b0..c9f65a47125 100644
 --- a/gas/doc/as.texi
 +++ b/gas/doc/as.texi
 @@ -6215,12 +6215,7 @@ With that definition, @samp{SUM 0,5} is equivalent to this assembly input:
@@ -139,7 +139,7 @@ index 1683594a0bb..6be54b57599 100644
  @node PushSection
  @section @code{.pushsection @var{name} [, @var{subsection}] [, "@var{flags}"[, @@@var{type}[,@var{arguments}]]]}
 diff --git a/gas/input-scrub.c b/gas/input-scrub.c
-index 25fac879a56..878edc8fd36 100644
+index 3433bc6472d..2e0ce832b2b 100644
 --- a/gas/input-scrub.c
 +++ b/gas/input-scrub.c
 @@ -23,7 +23,6 @@
@@ -175,7 +175,7 @@ index 25fac879a56..878edc8fd36 100644
  	  if (from_sb_expansion != expanding_app)
  	    --macro_nest;
 diff --git a/gas/macro.c b/gas/macro.c
-index a0f2a5c764c..8b376f7f490 100644
+index c1b43e76a61..5ae76c6e661 100644
 --- a/gas/macro.c
 +++ b/gas/macro.c
 @@ -44,24 +44,11 @@
@@ -642,7 +642,7 @@ index a0f2a5c764c..8b376f7f490 100644
 -    }
 -}
 diff --git a/gas/macro.h b/gas/macro.h
-index 97f2a5a4066..e87f64e70ca 100644
+index 55b28b2f82a..3ebcfe8c8fd 100644
 --- a/gas/macro.h
 +++ b/gas/macro.h
 @@ -64,28 +64,31 @@ typedef struct macro_struct
@@ -685,10 +685,10 @@ index 97f2a5a4066..e87f64e70ca 100644
  
  #endif
 diff --git a/gas/read.c b/gas/read.c
-index e5185f4ba26..589c7b080c2 100644
+index 5be2686822d..6d0d4b5e31a 100644
 --- a/gas/read.c
 +++ b/gas/read.c
-@@ -655,8 +655,7 @@ poend (void)
+@@ -656,8 +656,7 @@ poend (void)
      }
  
  /* Helper function of read_a_source_file, which tries to expand a macro.  */
@@ -698,7 +698,7 @@ index e5185f4ba26..589c7b080c2 100644
  try_macro (char term, const char *line)
  {
    sb out;
-@@ -673,14 +672,12 @@ try_macro (char term, const char *line)
+@@ -674,14 +673,12 @@ try_macro (char term, const char *line)
        sb_kill (&out);
        buffer_limit =
  	input_scrub_next_buffer (&input_line_pointer);
@@ -715,7 +715,7 @@ index e5185f4ba26..589c7b080c2 100644
  }
  
  #ifdef HANDLE_BUNDLE
-@@ -1272,7 +1269,7 @@ read_a_source_file (const char *name)
+@@ -1273,7 +1270,7 @@ read_a_source_file (const char *name)
  			  s_ignore (0);
  			  nul_char = next_char = *--input_line_pointer;
  			  *input_line_pointer = '\0';
@@ -724,7 +724,7 @@ index e5185f4ba26..589c7b080c2 100644
  			    {
  			      *end = '\0';
  			      as_bad (_("unknown pseudo-op: `%s'"), s);
-@@ -1309,7 +1306,7 @@ read_a_source_file (const char *name)
+@@ -1310,7 +1307,7 @@ read_a_source_file (const char *name)
  
  		      generate_lineno_debug ();
  
@@ -733,7 +733,7 @@ index e5185f4ba26..589c7b080c2 100644
  			continue;
  
  		      if (mri_pending_align)
-@@ -2819,7 +2816,7 @@ s_macro (int ignore ATTRIBUTE_UNUSED)
+@@ -2820,7 +2817,7 @@ s_macro (int ignore ATTRIBUTE_UNUSED)
  	  as_warn_where (macro->file, macro->line,
  			 _("attempt to redefine pseudo-op `%s' ignored"),
  			 macro->name);
@@ -743,7 +743,7 @@ index e5185f4ba26..589c7b080c2 100644
      }
  
 diff --git a/gas/testsuite/gas/macros/macros.exp b/gas/testsuite/gas/macros/macros.exp
-index 94ac37cdb8b..3ac199feaa5 100644
+index de3df4d803d..278cf405225 100644
 --- a/gas/testsuite/gas/macros/macros.exp
 +++ b/gas/testsuite/gas/macros/macros.exp
 @@ -112,4 +112,3 @@ run_list_test count
