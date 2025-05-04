@@ -1,0 +1,751 @@
+https://bugs.gentoo.org/866422
+https://sourceware.org/bugzilla/show_bug.cgi?id=21479#c10
+
+From 245176a7d6a92ab5283887a28a375c47585e41ee Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Sun, 4 May 2025 05:12:46 +0800
+Subject: [PATCH] strip: Add LTO IR support
+
+Add LTO IR support to strip by copying LTO IR input as unknown object
+file.  Don't enable LTO plugin in strip unless all LTO sections should
+be removed.  Add linker LTO tests for strip with --strip-unneeded and
+removing all LTO section.
+
+binutils/
+
+	PR binutils/21479
+	* objcopy.c: Include "plugin-api.h" and "plugin.h".
+	(lto_sections_removed): New.
+	(command_line_switch): Add OPTION_PLUGIN.
+	(strip_options): Likewise.
+	(strip_usage): Display "--plugin NAME".
+	(copy_unknown_file): New function.
+	(copy_unknown_object): Call copy_unknown_file.
+	(copy_archive): Copy input LTO IR member as unknown object.
+	(copy_file): Set input target to "plugin" for strip if it is
+	unset unless all LTO sections should be removed.  Copy input
+	LTO IR file as unknown file.
+	(strip_main): Call bfd_plugin_set_program_name. Handle
+	OPTION_PLUGIN.  Set lto_sections_removed to true if all GCC
+	LTO sections should be removed.
+	* doc/binutils.texi: Document --plugin for strip.
+
+ld/
+
+	PR binutils/21479
+	* testsuite/ld-plugin/lto-binutils.exp: New file.
+	* testsuite/ld-plugin/strip-1a-fat.c: Likewise.
+	* testsuite/ld-plugin/strip-1a-fat.rd: Likewise.
+	* testsuite/ld-plugin/strip-1b-fat.c: Likewise.
+	* testsuite/ld-plugin/strip-1b-fat.rd: Likewise.
+	* testsuite/ld-plugin/strip-1a.c: Likewise.
+	* testsuite/ld-plugin/strip-1b.c: Likewise.
+	* testsuite/lib/ld-lib.exp (run_cc_link_tests): Add optional
+	trailing ld options.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ binutils/doc/binutils.texi              |  21 ++
+ binutils/objcopy.c                      | 130 +++++++++--
+ ld/testsuite/ld-plugin/lto-binutils.exp | 292 ++++++++++++++++++++++++
+ ld/testsuite/ld-plugin/strip-1a-fat.c   |   1 +
+ ld/testsuite/ld-plugin/strip-1a-fat.rd  |   6 +
+ ld/testsuite/ld-plugin/strip-1a.c       |   4 +
+ ld/testsuite/ld-plugin/strip-1b-fat.c   |   1 +
+ ld/testsuite/ld-plugin/strip-1b-fat.rd  |   5 +
+ ld/testsuite/ld-plugin/strip-1b.c       |   3 +
+ ld/testsuite/lib/ld-lib.exp             |   9 +-
+ 10 files changed, 446 insertions(+), 26 deletions(-)
+ create mode 100644 ld/testsuite/ld-plugin/lto-binutils.exp
+ create mode 100644 ld/testsuite/ld-plugin/strip-1a-fat.c
+ create mode 100644 ld/testsuite/ld-plugin/strip-1a-fat.rd
+ create mode 100644 ld/testsuite/ld-plugin/strip-1a.c
+ create mode 100644 ld/testsuite/ld-plugin/strip-1b-fat.c
+ create mode 100644 ld/testsuite/ld-plugin/strip-1b-fat.rd
+ create mode 100644 ld/testsuite/ld-plugin/strip-1b.c
+
+diff --git a/binutils/doc/binutils.texi b/binutils/doc/binutils.texi
+index c74526e929a..05a10d20924 100644
+--- a/binutils/doc/binutils.texi
++++ b/binutils/doc/binutils.texi
+@@ -3566,6 +3566,7 @@ strip [@option{-F} @var{bfdname} |@option{--target=}@var{bfdname}]
+       [@option{--keep-section-symbols}]
+       [@option{--keep-file-symbols}]
+       [@option{--only-keep-debug}]
++      [@option{--plugin} @var{name}]
+       [@option{-v} |@option{--verbose}] [@option{-V}|@option{--version}]
+       [@option{--help}] [@option{--info}]
+       @var{objfile}@dots{}
+@@ -3825,6 +3826,26 @@ currently only supports the presence of one filename containing
+ debugging information, not multiple filenames on a one-per-object-file
+ basis.
+ 
++@item --plugin @var{name}
++@cindex plugins
++Load the plugin called @var{name} to add support for extra target
++types.  This option is only available if the toolchain has been built
++with plugin support enabled.
++
++If @option{--plugin} is not provided, but plugin support has been
++enabled then @command{strip} iterates over the files in
++@file{$@{libdir@}/bfd-plugins} in alphabetic order and the first
++plugin that claims the object in question is used.
++
++Please note that this plugin search directory is @emph{not} the one
++used by @command{ld}'s @option{-plugin} option.  In order to make
++@command{strip} use the  linker plugin it must be copied into the
++@file{$@{libdir@}/bfd-plugins} directory.  For GCC based compilations
++the linker plugin is called @file{liblto_plugin.so.0.0.0}.  For Clang
++based compilations it is called @file{LLVMgold.so}.  The GCC plugin
++is always backwards compatible with earlier versions, so it is
++sufficient to just copy the newest one.
++
+ @item -V
+ @itemx --version
+ Show the version number for @command{strip}.
+diff --git a/binutils/objcopy.c b/binutils/objcopy.c
+index 31933e13b7a..4990e6a7856 100644
+--- a/binutils/objcopy.c
++++ b/binutils/objcopy.c
+@@ -30,6 +30,8 @@
+ #include "coff/internal.h"
+ #include "libcoff.h"
+ #include "safe-ctype.h"
++#include "plugin-api.h"
++#include "plugin.h"
+ 
+ /* FIXME: See bfd/peXXigen.c for why we include an architecture specific
+    header in generic PE code.  */
+@@ -165,6 +167,9 @@ static struct section_list *change_sections;
+ /* TRUE if some sections are to be removed.  */
+ static bool sections_removed;
+ 
++/* TRUE if all GCC LTO sections are to be removed.  */
++static bool lto_sections_removed;
++
+ /* TRUE if only some sections are to be copied.  */
+ static bool sections_copied;
+ 
+@@ -359,6 +364,7 @@ enum command_line_switch
+   OPTION_RENAME_SECTION,
+   OPTION_REVERSE_BYTES,
+   OPTION_PE_SECTION_ALIGNMENT,
++  OPTION_PLUGIN,
+   OPTION_SET_SECTION_FLAGS,
+   OPTION_SET_SECTION_ALIGNMENT,
+   OPTION_SET_START,
+@@ -402,6 +408,7 @@ static struct option strip_options[] =
+   {"output-file", required_argument, 0, 'o'},
+   {"output-format", required_argument, 0, 'O'},	/* Obsolete */
+   {"output-target", required_argument, 0, 'O'},
++  {"plugin", required_argument, 0, OPTION_PLUGIN},
+   {"preserve-dates", no_argument, 0, 'p'},
+   {"remove-section", required_argument, 0, 'R'},
+   {"remove-relocations", required_argument, 0, OPTION_REMOVE_RELOCS},
+@@ -758,6 +765,10 @@ strip_usage (FILE *stream, int exit_status)
+      --info                        List object formats & architectures supported\n\
+   -o <file>                        Place stripped output into <file>\n\
+ "));
++#if BFD_SUPPORTS_PLUGINS
++  fprintf (stream, _("\
++      --plugin NAME                Load the specified plugin\n"));
++#endif
+ 
+   list_supported_targets (program_name, stream);
+   if (REPORT_BUGS_TO[0] && exit_status == 0)
+@@ -1916,20 +1927,11 @@ add_redefine_syms_file (const char *filename)
+    Returns TRUE upon success, FALSE otherwise.  */
+ 
+ static bool
+-copy_unknown_object (bfd *ibfd, bfd *obfd)
++copy_unknown_file (bfd *ibfd, bfd *obfd, off_t size, unsigned int mode)
+ {
+   char *cbuf;
+   bfd_size_type tocopy;
+-  off_t size;
+-  struct stat buf;
+-
+-  if (bfd_stat_arch_elt (ibfd, &buf) != 0)
+-    {
+-      bfd_nonfatal_message (NULL, ibfd, NULL, NULL);
+-      return false;
+-    }
+ 
+-  size = buf.st_size;
+   if (size < 0)
+     {
+       non_fatal (_("stat returns negative size for `%s'"),
+@@ -1974,11 +1976,40 @@ copy_unknown_object (bfd *ibfd, bfd *obfd)
+ 
+   /* We should at least to be able to read it back when copying an
+      unknown object in an archive.  */
+-  chmod (bfd_get_filename (obfd), buf.st_mode | S_IRUSR);
++  chmod (bfd_get_filename (obfd), mode | S_IRUSR);
+   free (cbuf);
+   return true;
+ }
+ 
++/* Copy unknown object file archive member IBFD onto OBFD.
++   Returns TRUE upon success, FALSE otherwise.  */
++
++static bool
++copy_unknown_object (bfd *ibfd, bfd *obfd)
++{
++  off_t size;
++  struct stat buf;
++
++  if (bfd_stat_arch_elt (ibfd, &buf) != 0)
++    {
++      bfd_nonfatal_message (NULL, ibfd, NULL, NULL);
++      return false;
++    }
++
++  size = buf.st_size;
++  if (size < 0)
++    {
++      non_fatal (_("stat returns negative size for `%s'"),
++		 bfd_get_archive_filename (ibfd));
++      return false;
++    }
++
++  if (!copy_unknown_file (ibfd, obfd, size, buf.st_mode))
++    return false;
++
++  return true;
++}
++
+ typedef struct objcopy_internal_note
+ {
+   Elf_Internal_Note  note;
+@@ -3744,7 +3775,10 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
+ 	  goto cleanup_and_exit;
+ 	}
+ 
+-      if (ok_object)
++      /* Copy LTO IR file as unknown object.  */
++      if (bfd_plugin_target_p (ibfd->xvec))
++	ok_object = false;
++      else if (ok_object)
+ 	{
+ 	  ok = copy_object (this_element, output_element, input_arch);
+ 
+@@ -3845,6 +3879,7 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+   char **obj_matching;
+   char **core_matching;
+   off_t size = get_file_size (input_filename);
++  const char *target = input_target;
+ 
+   if (size < 1)
+     {
+@@ -3855,9 +3890,16 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+       return;
+     }
+ 
++#if BFD_SUPPORTS_PLUGINS
++  /* Enable LTO plugin in strip unless all LTO sections should be
++     removed.  */
++  if (is_strip && !target && !lto_sections_removed)
++    target = "plugin";
++#endif
++
+   /* To allow us to do "strip *" without dying on the first
+      non-object file, failures are nonfatal.  */
+-  ibfd = bfd_openr (input_filename, input_target);
++  ibfd = bfd_openr (input_filename, target);
+   if (ibfd == NULL || bfd_stat (ibfd, in_stat) != 0)
+     {
+       bfd_nonfatal_message (input_filename, NULL, NULL, NULL);
+@@ -3974,17 +4016,29 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+  	  return;
+  	}
+ 
+-      if (! copy_object (ibfd, obfd, input_arch))
+-	status = 1;
+-
+-      /* PR 17512: file: 0f15796a.
+-	 If the file could not be copied it may not be in a writeable
+-	 state.  So use bfd_close_all_done to avoid the possibility of
+-	 writing uninitialised data into the file.  */
+-      if (! (status ? bfd_close_all_done (obfd) : bfd_close (obfd)))
++      if (bfd_plugin_target_p (ibfd->xvec))
+ 	{
+-	  status = 1;
+-	  bfd_nonfatal_message (output_filename, NULL, NULL, NULL);
++	  /* Copy LTO IR file as unknown file.  */
++	  if (!copy_unknown_file (ibfd, obfd, in_stat->st_size,
++				  in_stat->st_mode))
++	    status = 1;
++	  else if (!bfd_close_all_done (obfd))
++	    status = 1;
++	}
++      else
++	{
++	  if (! copy_object (ibfd, obfd, input_arch))
++	    status = 1;
++
++	  /* PR 17512: file: 0f15796a.
++	     If the file could not be copied it may not be in a writeable
++	     state.  So use bfd_close_all_done to avoid the possibility of
++	     writing uninitialised data into the file.  */
++	  if (! (status ? bfd_close_all_done (obfd) : bfd_close (obfd)))
++	    {
++	      status = 1;
++	      bfd_nonfatal_message (output_filename, NULL, NULL, NULL);
++	    }
+ 	}
+ 
+       if (!bfd_close (ibfd))
+@@ -4837,6 +4891,17 @@ strip_main (int argc, char *argv[])
+   char *output_file = NULL;
+   bool merge_notes_set = false;
+ 
++#if BFD_SUPPORTS_PLUGINS
++  /* All GCC LTO section prefixes.  */
++  const char *GCC_LTO_sections[] =
++    {
++      ".gnu.debuglto_.",
++      ".gnu.lto_."
++    };
++
++  bfd_plugin_set_program_name (argv[0]);
++#endif
++
+   while ((c = getopt_long (argc, argv, "I:O:F:K:MN:R:o:sSpdgxXHhVvwDU",
+ 			   strip_options, (int *) 0)) != EOF)
+     {
+@@ -4927,6 +4992,13 @@ strip_main (int argc, char *argv[])
+ 	case OPTION_KEEP_SECTION_SYMBOLS:
+ 	  keep_section_symbols = true;
+ 	  break;
++	case OPTION_PLUGIN:	/* --plugin */
++#if BFD_SUPPORTS_PLUGINS
++	  bfd_plugin_set_plugin (optarg);
++#else
++	  fatal (_("sorry - this program has been built without plugin support\n"));
++#endif
++	  break;
+ 	case 0:
+ 	  /* We've been given a long option.  */
+ 	  break;
+@@ -4971,6 +5043,18 @@ strip_main (int argc, char *argv[])
+   if (output_target == NULL)
+     output_target = input_target;
+ 
++#if BFD_SUPPORTS_PLUGINS
++  /* Check if all GCC LTO sections should be removed.  */
++  lto_sections_removed = true;
++  for (i = 0; i < (int) ARRAY_SIZE (GCC_LTO_sections); i++)
++    if (!find_section_list (GCC_LTO_sections[i], false,
++			    SECTION_CONTEXT_REMOVE))
++      {
++	lto_sections_removed = false;
++	break;
++      }
++#endif
++
+   i = optind;
+   if (i == argc
+       || (output_file != NULL && (i + 1) < argc))
+diff --git a/ld/testsuite/ld-plugin/lto-binutils.exp b/ld/testsuite/ld-plugin/lto-binutils.exp
+new file mode 100644
+index 00000000000..aeb03ea8326
+--- /dev/null
++++ b/ld/testsuite/ld-plugin/lto-binutils.exp
+@@ -0,0 +1,292 @@
++# Expect script for binutils tests with LTO
++# Copyright (C) 2025 Free Software Foundation, Inc.
++#
++# This file is part of the GNU Binutils.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
++# MA 02110-1301, USA.
++#
++
++# Make sure that binutils can correctly handle LTO IR in ELF.
++
++if { !([istarget *-*-linux*]
++       || [istarget arm*-*-uclinuxfdpiceabi]
++       || [istarget *-*-nacl*]
++       || [istarget *-*-gnu*]) || [istarget *ecoff] } then {
++    return
++}
++
++# Check to see if the C and C++ compilers work
++if { ![check_compiler_available] || [which $CXX_FOR_TARGET] == 0 } {
++    return
++}
++
++# These tests require plugin and LTO.
++if { ![check_plugin_api_available]
++     || ![check_lto_available] } {
++    return
++}
++
++set lto_fat ""
++set lto_no_fat ""
++if { [check_lto_fat_available] } {
++  set lto_fat "-ffat-lto-objects"
++  set lto_no_fat "-fno-fat-lto-objects"
++  set no_lto "-fno-lto"
++}
++
++set lto_plugin [string trim [run_host_cmd "$CC_FOR_TARGET" "-print-prog-name=liblto_plugin.so"]]
++
++# List contains test-items:
++#  0:program name
++#  1:program options
++#  2:input file
++#  3:output file
++#  4:action list (optional)
++#
++proc lto_binutils_test { lto_tests } {
++    global srcdir
++    global subdir
++    global nm
++    global objcopy
++    global objdump
++    global READELF
++    global strip
++    global lto_plugin
++
++    foreach testitem $lto_tests {
++	set prog_name [lindex $testitem 0]
++	set prog_options [lindex $testitem 1]
++	set input tmpdir/[lindex $testitem 2]
++	set output tmpdir/[lindex $testitem 3]
++	set actions [lindex $testitem 4]
++	set objfiles {}
++	set failed 0
++
++	# Don't leave previous output around
++	if { $output ne "tmpdir/" } {
++	    remote_file host delete $output
++	}
++
++	eval set prog \$$prog_name
++
++	append prog_options " --plugin $lto_plugin"
++
++	set test_name "$prog_name $prog_options ($input)"
++
++	set cmd "$prog $prog_options -o $output $input"
++	send_log "$cmd\n"
++	set got [remote_exec host "$cmd"]
++	if { [lindex $got 0] != 0 || ![string match "" [lindex $got 1]] } then {
++	    send_log "$got\n"
++	    fail "$test_name"
++	    continue
++	}
++
++	if { $failed == 0 } {
++	    foreach actionlist $actions {
++		set action [lindex $actionlist 0]
++		set progopts [lindex $actionlist 1]
++
++		# There are actions where we run regexp_diff on the
++		# output, and there are other actions (presumably).
++		# Handling of the former look the same.
++		set dump_prog ""
++		switch -- $action {
++		    objdump
++			{ set dump_prog $objdump }
++		    nm
++			{ set dump_prog $nm }
++		    readelf
++			{ set dump_prog $READELF }
++		    default
++			{
++			    perror "Unrecognized action $action"
++			    set is_unresolved 1
++			    break
++			}
++		    }
++
++		if { $dump_prog != "" } {
++		    set dumpfile [lindex $actionlist 2]
++		    set binary $dump_prog
++
++		    # Ensure consistent sorting of symbols
++		    if {[info exists env(LC_ALL)]} {
++			set old_lc_all $env(LC_ALL)
++		    }
++		    set env(LC_ALL) "C"
++		    set cmd "$binary $progopts $output > tmpdir/dump.out"
++		    send_log "$cmd\n"
++		    catch "exec $cmd" comp_output
++		    if {[info exists old_lc_all]} {
++			set env(LC_ALL) $old_lc_all
++		    } else {
++			unset env(LC_ALL)
++		    }
++		    set comp_output [prune_warnings $comp_output]
++
++		    if ![string match "" $comp_output] then {
++			send_log "$comp_output\n"
++			set failed 1
++			break
++		    }
++
++		    if { [regexp_diff "tmpdir/dump.out" "$srcdir/$subdir/$dumpfile"] } then {
++			verbose -log "output is [file_contents "tmpdir/dump.out"]" 2
++			set failed 1
++			break
++		    }
++		}
++	    }
++	}
++
++	if { $failed } {
++	    fail $test_name
++	} else {
++	    pass $test_name
++	}
++    }
++}
++
++run_cc_link_tests [list \
++    [list \
++	"Build strip-1a.o" \
++	"" \
++	"-O2 -flto $lto_no_fat" \
++	{ strip-1a.c } \
++    ] \
++    [list \
++	"Build libstrip-1a.a" \
++	"--plugin $lto_plugin" \
++	"-O2 -flto $lto_no_fat" \
++	{ strip-1a.c } \
++	{} \
++	"libstrip-1a.a" \
++    ] \
++    [list \
++	"Build strip-1a-fat.o" \
++	"" \
++	"-O2 -flto $lto_fat" \
++	{ strip-1a-fat.c } \
++    ] \
++    [list \
++	"Build libstrip-1a-fat.a" \
++	"--plugin $lto_plugin" \
++	"-O2 -flto $lto_fat" \
++	{ strip-1a-fat.c } \
++	{} \
++	"libstrip-1a-fat.a" \
++    ] \
++]
++
++lto_binutils_test [list \
++    [list \
++	"strip" \
++	"--strip-unneeded" \
++	"libstrip-1a.a" \
++	"libstrip-1a-s.a" \
++    ] \
++    [list \
++	"strip" \
++	"--strip-unneeded" \
++	"strip-1a.o" \
++	"strip-1a-s.o" \
++    ] \
++    [list \
++	"strip" \
++	"-R .gnu.*lto_* -N __gnu_lto_v1" \
++	"libstrip-1a-fat.a" \
++	"libstrip-1a-fat-s.a" \
++	{{readelf -SW strip-1a-fat.rd}} \
++    ] \
++    [list \
++	"strip" \
++	"-R .gnu.*lto_* -N __gnu_lto_v1" \
++	"strip-1a-fat.o" \
++	"strip-1a-fat-s.o" \
++	{{readelf -SW strip-1a-fat.rd}} \
++    ] \
++    [list \
++	"strip" \
++	"-R .gnu.lto_*" \
++	"strip-1a-fat.o" \
++	"strip-1b-fat-s.o" \
++	{{readelf -SW strip-1b-fat.rd}} \
++    ] \
++]
++
++run_cc_link_tests [list \
++    [list \
++	"Build strip-1a" \
++	"" \
++	"-O2 -flto $lto_no_fat" \
++	{ strip-1b.c } \
++	{} \
++	"libstrip-1a" \
++	"C" \
++	"tmpdir/strip-1a.o" \
++    ] \
++    [list \
++	"Build strip-1b" \
++	"" \
++	"-O2 -flto $lto_no_fat" \
++	{ strip-1b.c } \
++	{} \
++	"libstrip-1b" \
++	"C" \
++	"tmpdir/strip-1a-s.o" \
++    ] \
++    [list \
++	"Build strip-1c" \
++	"" \
++	"-O2 -flto $lto_no_fat" \
++	{ strip-1b.c } \
++	{} \
++	"libstrip-1c" \
++	"C" \
++	"tmpdir/libstrip-1a.a" \
++    ] \
++    [list \
++	"Build strip-1d" \
++	"" \
++	"-O2 -flto $lto_no_fat" \
++	{ strip-1b.c } \
++	{} \
++	"libstrip-1d" \
++	"C" \
++	"tmpdir/libstrip-1a-s.a" \
++    ] \
++    [list \
++	"Build strip-1e" \
++	"" \
++	"-O2 -flto $lto_fat" \
++	{ strip-1b-fat.c } \
++	{} \
++	"libstrip-1b" \
++	"C" \
++	"tmpdir/strip-1a-fat-s.o" \
++    ] \
++    [list \
++	"Build strip-1f" \
++	"" \
++	"-O2 -flto $lto_fat" \
++	{ strip-1b-fat.c } \
++	{} \
++	"libstrip-1d" \
++	"C" \
++	"tmpdir/libstrip-1a-fat-s.a" \
++    ] \
++]
+diff --git a/ld/testsuite/ld-plugin/strip-1a-fat.c b/ld/testsuite/ld-plugin/strip-1a-fat.c
+new file mode 100644
+index 00000000000..03b2a5c2275
+--- /dev/null
++++ b/ld/testsuite/ld-plugin/strip-1a-fat.c
+@@ -0,0 +1 @@
++#include "strip-1a.c"
+diff --git a/ld/testsuite/ld-plugin/strip-1a-fat.rd b/ld/testsuite/ld-plugin/strip-1a-fat.rd
+new file mode 100644
+index 00000000000..aefe1c55013
+--- /dev/null
++++ b/ld/testsuite/ld-plugin/strip-1a-fat.rd
+@@ -0,0 +1,6 @@
++#failif
++#...
++Section Headers:
++#...
++  \[[ 0-9]+\] \.gnu.lto_.*
++#...
+diff --git a/ld/testsuite/ld-plugin/strip-1a.c b/ld/testsuite/ld-plugin/strip-1a.c
+new file mode 100644
+index 00000000000..d84af205338
+--- /dev/null
++++ b/ld/testsuite/ld-plugin/strip-1a.c
+@@ -0,0 +1,4 @@
++extern void foo2(void);
++extern void foo3(void);
++void foo1(void) { foo3(); }
++int main(void) { foo2(); }
+diff --git a/ld/testsuite/ld-plugin/strip-1b-fat.c b/ld/testsuite/ld-plugin/strip-1b-fat.c
+new file mode 100644
+index 00000000000..1a2e4d2d86a
+--- /dev/null
++++ b/ld/testsuite/ld-plugin/strip-1b-fat.c
+@@ -0,0 +1 @@
++#include "strip-1b.c"
+diff --git a/ld/testsuite/ld-plugin/strip-1b-fat.rd b/ld/testsuite/ld-plugin/strip-1b-fat.rd
+new file mode 100644
+index 00000000000..e3a266f8bee
+--- /dev/null
++++ b/ld/testsuite/ld-plugin/strip-1b-fat.rd
+@@ -0,0 +1,5 @@
++#...
++Section Headers:
++#...
++  \[[ 0-9]+\] \.gnu.lto_.*
++#pass
+diff --git a/ld/testsuite/ld-plugin/strip-1b.c b/ld/testsuite/ld-plugin/strip-1b.c
+new file mode 100644
+index 00000000000..967872a0f12
+--- /dev/null
++++ b/ld/testsuite/ld-plugin/strip-1b.c
+@@ -0,0 +1,3 @@
++extern void foo1(void);
++void foo2(void) { foo1(); }
++void foo3(void) {}
+diff --git a/ld/testsuite/lib/ld-lib.exp b/ld/testsuite/lib/ld-lib.exp
+index 96152718d6f..119410bc523 100644
+--- a/ld/testsuite/lib/ld-lib.exp
++++ b/ld/testsuite/lib/ld-lib.exp
+@@ -860,14 +860,15 @@ proc run_ld_link_exec_tests { ldtests args } {
+ }
+ 
+ # List contains test-items with 3 items followed by 2 lists, one item and
+-# one optional item:
++# 2 optional items:
+ #  0:name
+-#  1:ld or ar options
++#  1:leading ld or ar options
+ #  2:compile options
+ #  3:filenames of source files
+ #  4:action and options.
+ #  5:name of output file
+ #  6:language (optional)
++#  7:trailing ld options (optional), placed after object files
+ #
+ # Actions:
+ # objdump: Apply objdump options on result.  Compare with regex (last arg).
+@@ -899,6 +900,7 @@ proc run_cc_link_tests { ldtests } {
+ 	set actions [lindex $testitem 4]
+ 	set binfile tmpdir/[lindex $testitem 5]
+ 	set lang [lindex $testitem 6]
++	set trailing_ldflags [lindex $testitem 7]
+ 	set objfiles {}
+ 	set is_unresolved 0
+ 	set failed 0
+@@ -927,6 +929,7 @@ proc run_cc_link_tests { ldtests } {
+ 	#verbose -log "actions   is $actions"
+ 	#verbose -log "binfile   is $binfile"
+ 	#verbose -log "lang      is $lang"
++	#verbose -log "trailing_ldflags is $trailing_ldflags"
+ 
+ 	foreach actionlist $actions {
+ 	    set action [lindex $actionlist 0]
+@@ -1006,7 +1009,7 @@ proc run_cc_link_tests { ldtests } {
+ 		untested $testname
+ 		continue
+ 	    }
+-	    ld_link $cc_cmd $binfile "-L$srcdir/$subdir $ldflags $objfiles"
++	    ld_link $cc_cmd $binfile "-L$srcdir/$subdir $ldflags $objfiles $trailing_ldflags"
+ 	    set ld_output "$exec_output"
+ 
+ 	    if { $check_ld(source) == "regexp" } then {
+-- 
+2.49.0
