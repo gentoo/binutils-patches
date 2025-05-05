@@ -1,15 +1,16 @@
 https://bugs.gentoo.org/866422
-https://sourceware.org/bugzilla/show_bug.cgi?id=21479#c10
+https://sourceware.org/bugzilla/show_bug.cgi?id=21479#c11
 
-From 245176a7d6a92ab5283887a28a375c47585e41ee Mon Sep 17 00:00:00 2001
+From 55472ad8a1329a22c1b6fc97021b36059a73de61 Mon Sep 17 00:00:00 2001
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Sun, 4 May 2025 05:12:46 +0800
-Subject: [PATCH] strip: Add LTO IR support
+Subject: [PATCH] strip: Add GCC LTO IR support
 
-Add LTO IR support to strip by copying LTO IR input as unknown object
-file.  Don't enable LTO plugin in strip unless all LTO sections should
-be removed.  Add linker LTO tests for strip with --strip-unneeded and
-removing all LTO section.
+Add GCC LTO IR support to strip by copying GCC LTO IR input as unknown
+object file.  Don't enable LTO plugin in strip unless all LTO sections
+should be removed, assuming all LTO sections will be removed with
+-R .gnu.lto_.*.  Add linker LTO tests for strip with --strip-unneeded
+and GCC LTO IR inputs.
 
 binutils/
 
@@ -46,8 +47,8 @@ ld/
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
  binutils/doc/binutils.texi              |  21 ++
- binutils/objcopy.c                      | 130 +++++++++--
- ld/testsuite/ld-plugin/lto-binutils.exp | 292 ++++++++++++++++++++++++
+ binutils/objcopy.c                      | 119 +++++++--
+ ld/testsuite/ld-plugin/lto-binutils.exp | 341 ++++++++++++++++++++++++
  ld/testsuite/ld-plugin/strip-1a-fat.c   |   1 +
  ld/testsuite/ld-plugin/strip-1a-fat.rd  |   6 +
  ld/testsuite/ld-plugin/strip-1a.c       |   4 +
@@ -55,7 +56,7 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  ld/testsuite/ld-plugin/strip-1b-fat.rd  |   5 +
  ld/testsuite/ld-plugin/strip-1b.c       |   3 +
  ld/testsuite/lib/ld-lib.exp             |   9 +-
- 10 files changed, 446 insertions(+), 26 deletions(-)
+ 10 files changed, 484 insertions(+), 26 deletions(-)
  create mode 100644 ld/testsuite/ld-plugin/lto-binutils.exp
  create mode 100644 ld/testsuite/ld-plugin/strip-1a-fat.c
  create mode 100644 ld/testsuite/ld-plugin/strip-1a-fat.rd
@@ -104,7 +105,7 @@ index c74526e929a..05a10d20924 100644
  @itemx --version
  Show the version number for @command{strip}.
 diff --git a/binutils/objcopy.c b/binutils/objcopy.c
-index 31933e13b7a..4990e6a7856 100644
+index 31933e13b7a..1396dd10bbe 100644
 --- a/binutils/objcopy.c
 +++ b/binutils/objcopy.c
 @@ -30,6 +30,8 @@
@@ -164,13 +165,13 @@ index 31933e13b7a..4990e6a7856 100644
    bfd_size_type tocopy;
 -  off_t size;
 -  struct stat buf;
--
+ 
 -  if (bfd_stat_arch_elt (ibfd, &buf) != 0)
 -    {
 -      bfd_nonfatal_message (NULL, ibfd, NULL, NULL);
 -      return false;
 -    }
- 
+-
 -  size = buf.st_size;
    if (size < 0)
      {
@@ -295,25 +296,18 @@ index 31933e13b7a..4990e6a7856 100644
  	}
  
        if (!bfd_close (ibfd))
-@@ -4837,6 +4891,17 @@ strip_main (int argc, char *argv[])
+@@ -4837,6 +4891,10 @@ strip_main (int argc, char *argv[])
    char *output_file = NULL;
    bool merge_notes_set = false;
  
 +#if BFD_SUPPORTS_PLUGINS
-+  /* All GCC LTO section prefixes.  */
-+  const char *GCC_LTO_sections[] =
-+    {
-+      ".gnu.debuglto_.",
-+      ".gnu.lto_."
-+    };
-+
 +  bfd_plugin_set_program_name (argv[0]);
 +#endif
 +
    while ((c = getopt_long (argc, argv, "I:O:F:K:MN:R:o:sSpdgxXHhVvwDU",
  			   strip_options, (int *) 0)) != EOF)
      {
-@@ -4927,6 +4992,13 @@ strip_main (int argc, char *argv[])
+@@ -4927,6 +4985,13 @@ strip_main (int argc, char *argv[])
  	case OPTION_KEEP_SECTION_SYMBOLS:
  	  keep_section_symbols = true;
  	  break;
@@ -327,20 +321,16 @@ index 31933e13b7a..4990e6a7856 100644
  	case 0:
  	  /* We've been given a long option.  */
  	  break;
-@@ -4971,6 +5043,18 @@ strip_main (int argc, char *argv[])
+@@ -4971,6 +5036,14 @@ strip_main (int argc, char *argv[])
    if (output_target == NULL)
      output_target = input_target;
  
 +#if BFD_SUPPORTS_PLUGINS
-+  /* Check if all GCC LTO sections should be removed.  */
-+  lto_sections_removed = true;
-+  for (i = 0; i < (int) ARRAY_SIZE (GCC_LTO_sections); i++)
-+    if (!find_section_list (GCC_LTO_sections[i], false,
-+			    SECTION_CONTEXT_REMOVE))
-+      {
-+	lto_sections_removed = false;
-+	break;
-+      }
++  /* Check if all GCC LTO sections should be removed, assuming all LTO
++     sections will be removed with -R .gnu.lto_.*.  * Remove .gnu.lto_.*
++     sections will also remove .gnu.debuglto_.  sections.  */
++  lto_sections_removed = !!find_section_list (".gnu.lto_.*", false,
++					      SECTION_CONTEXT_REMOVE);
 +#endif
 +
    i = optind;
@@ -348,10 +338,10 @@ index 31933e13b7a..4990e6a7856 100644
        || (output_file != NULL && (i + 1) < argc))
 diff --git a/ld/testsuite/ld-plugin/lto-binutils.exp b/ld/testsuite/ld-plugin/lto-binutils.exp
 new file mode 100644
-index 00000000000..aeb03ea8326
+index 00000000000..c475d42b728
 --- /dev/null
 +++ b/ld/testsuite/ld-plugin/lto-binutils.exp
-@@ -0,0 +1,292 @@
+@@ -0,0 +1,341 @@
 +# Expect script for binutils tests with LTO
 +# Copyright (C) 2025 Free Software Foundation, Inc.
 +#
@@ -410,7 +400,7 @@ index 00000000000..aeb03ea8326
 +#  3:output file
 +#  4:action list (optional)
 +#
-+proc lto_binutils_test { lto_tests } {
++proc run_lto_binutils_test { lto_tests } {
 +    global srcdir
 +    global subdir
 +    global nm
@@ -427,20 +417,40 @@ index 00000000000..aeb03ea8326
 +	set output tmpdir/[lindex $testitem 3]
 +	set actions [lindex $testitem 4]
 +	set objfiles {}
++	set is_unresolved 0
 +	set failed 0
++
++#	eval set prog \$$prog_name
++	switch -- $prog_name {
++	objcopy
++	    {
++		set prog $objcopy
++		set prog_output "$output"
++	    }
++	strip
++	    {
++		set prog $strip
++		set prog_output "-o $output"
++	    }
++	default
++	    {
++		perror "Unrecognized action $action"
++		set is_unresolved 1
++		break
++	    }
++	}
 +
 +	# Don't leave previous output around
 +	if { $output ne "tmpdir/" } {
 +	    remote_file host delete $output
 +	}
 +
-+	eval set prog \$$prog_name
-+
 +	append prog_options " --plugin $lto_plugin"
 +
-+	set test_name "$prog_name $prog_options ($input)"
++	set cmd_options "$prog_options $prog_output $input"
++	set test_name "$prog_name $cmd_options"
 +
-+	set cmd "$prog $prog_options -o $output $input"
++	set cmd "$prog $cmd_options"
 +	send_log "$cmd\n"
 +	set got [remote_exec host "$cmd"]
 +	if { [lindex $got 0] != 0 || ![string match "" [lindex $got 1]] } then {
@@ -509,6 +519,8 @@ index 00000000000..aeb03ea8326
 +
 +	if { $failed } {
 +	    fail $test_name
++	} elseif { $is_unresolved } {
++	    unresolved $test_name
 +	} else {
 +	    pass $test_name
 +	}
@@ -546,7 +558,7 @@ index 00000000000..aeb03ea8326
 +    ] \
 +]
 +
-+lto_binutils_test [list \
++run_lto_binutils_test [list \
 +    [list \
 +	"strip" \
 +	"--strip-unneeded" \
@@ -561,21 +573,28 @@ index 00000000000..aeb03ea8326
 +    ] \
 +    [list \
 +	"strip" \
-+	"-R .gnu.*lto_* -N __gnu_lto_v1" \
++	"--strip-unneeded -R .gnu.*lto_* -N __gnu_lto_v1" \
 +	"libstrip-1a-fat.a" \
 +	"libstrip-1a-fat-s.a" \
 +	{{readelf -SW strip-1a-fat.rd}} \
 +    ] \
 +    [list \
 +	"strip" \
-+	"-R .gnu.*lto_* -N __gnu_lto_v1" \
++	"--strip-unneeded -R .gnu.*lto_* -N __gnu_lto_v1" \
 +	"strip-1a-fat.o" \
 +	"strip-1a-fat-s.o" \
 +	{{readelf -SW strip-1a-fat.rd}} \
 +    ] \
 +    [list \
 +	"strip" \
-+	"-R .gnu.lto_*" \
++	"--strip-unneeded -R .gnu.debuglto_*" \
++	"libstrip-1a-fat.a" \
++	"libstrip-1b-fat-s.a" \
++	{{readelf -SW strip-1b-fat.rd}} \
++    ] \
++    [list \
++	"strip" \
++	"--strip-unneeded -R .gnu.debuglto_*" \
 +	"strip-1a-fat.o" \
 +	"strip-1b-fat-s.o" \
 +	{{readelf -SW strip-1b-fat.rd}} \
@@ -584,7 +603,7 @@ index 00000000000..aeb03ea8326
 +
 +run_cc_link_tests [list \
 +    [list \
-+	"Build strip-1a" \
++	"Build strip-1a (strip-1a.o)" \
 +	"" \
 +	"-O2 -flto $lto_no_fat" \
 +	{ strip-1b.c } \
@@ -594,7 +613,7 @@ index 00000000000..aeb03ea8326
 +	"tmpdir/strip-1a.o" \
 +    ] \
 +    [list \
-+	"Build strip-1b" \
++	"Build strip-1b (strip-1a-s.o)" \
 +	"" \
 +	"-O2 -flto $lto_no_fat" \
 +	{ strip-1b.c } \
@@ -604,7 +623,7 @@ index 00000000000..aeb03ea8326
 +	"tmpdir/strip-1a-s.o" \
 +    ] \
 +    [list \
-+	"Build strip-1c" \
++	"Build strip-1c (libstrip-1a.a)" \
 +	"" \
 +	"-O2 -flto $lto_no_fat" \
 +	{ strip-1b.c } \
@@ -614,7 +633,7 @@ index 00000000000..aeb03ea8326
 +	"tmpdir/libstrip-1a.a" \
 +    ] \
 +    [list \
-+	"Build strip-1d" \
++	"Build strip-1d (libstrip-1a-s.a)" \
 +	"" \
 +	"-O2 -flto $lto_no_fat" \
 +	{ strip-1b.c } \
@@ -624,24 +643,44 @@ index 00000000000..aeb03ea8326
 +	"tmpdir/libstrip-1a-s.a" \
 +    ] \
 +    [list \
-+	"Build strip-1e" \
++	"Build strip-1e (strip-1a-fat-s.o)" \
 +	"" \
 +	"-O2 -flto $lto_fat" \
 +	{ strip-1b-fat.c } \
 +	{} \
-+	"libstrip-1b" \
++	"libstrip-1e" \
 +	"C" \
 +	"tmpdir/strip-1a-fat-s.o" \
 +    ] \
 +    [list \
 +	"Build strip-1f" \
 +	"" \
++	"-O2 -flto $lto_fat (libstrip-1a-fat-s.a)" \
++	{ strip-1b-fat.c } \
++	{} \
++	"libstrip-1f" \
++	"C" \
++	"tmpdir/libstrip-1a-fat-s.a" \
++    ] \
++    [list \
++	"Build strip-1g (strip-1b-fat-s.o)" \
++	"" \
 +	"-O2 -flto $lto_fat" \
 +	{ strip-1b-fat.c } \
 +	{} \
-+	"libstrip-1d" \
++	"libstrip-1g" \
 +	"C" \
-+	"tmpdir/libstrip-1a-fat-s.a" \
++	"tmpdir/strip-1b-fat-s.o" \
++    ] \
++    [list \
++	"Build strip-1h (libstrip-1b-fat-s.a)" \
++	"" \
++	"-O2 -flto $lto_fat" \
++	{ strip-1b-fat.c } \
++	{} \
++	"libstrip-1h" \
++	"C" \
++	"tmpdir/libstrip-1b-fat-s.a" \
 +    ] \
 +]
 diff --git a/ld/testsuite/ld-plugin/strip-1a-fat.c b/ld/testsuite/ld-plugin/strip-1a-fat.c
