@@ -1,10 +1,10 @@
 https://bugs.gentoo.org/866422
-https://inbox.sourceware.org/binutils/CAMe9rOq_LMn22bBNAQs2=-vDxEaONziAPEvuCAJy1K3+Chu7_g@mail.gmail.com/
+https://inbox.sourceware.org/binutils/CAMe9rOrW5hQ42pSMkZ9XW1LcDkv++YmG_hWoOUexMDMXZ4kaRw@mail.gmail.com/
 
-From 55472ad8a1329a22c1b6fc97021b36059a73de61 Mon Sep 17 00:00:00 2001
+From 1e0ffbb5fd03eb10d3c4a77f2d6c05a296f970c8 Mon Sep 17 00:00:00 2001
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Sun, 4 May 2025 05:12:46 +0800
-Subject: [PATCH] strip: Add GCC LTO IR support
+Subject: [PATCH v3] strip: Add GCC LTO IR support
 
 Add GCC LTO IR support to strip by copying GCC LTO IR input as unknown
 object file.  Don't enable LTO plugin in strip unless all LTO sections
@@ -47,7 +47,7 @@ ld/
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
  binutils/doc/binutils.texi              |  21 ++
- binutils/objcopy.c                      | 119 +++++++--
+ binutils/objcopy.c                      | 112 ++++++--
  ld/testsuite/ld-plugin/lto-binutils.exp | 341 ++++++++++++++++++++++++
  ld/testsuite/ld-plugin/strip-1a-fat.c   |   1 +
  ld/testsuite/ld-plugin/strip-1a-fat.rd  |   6 +
@@ -56,7 +56,7 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  ld/testsuite/ld-plugin/strip-1b-fat.rd  |   5 +
  ld/testsuite/ld-plugin/strip-1b.c       |   3 +
  ld/testsuite/lib/ld-lib.exp             |   9 +-
- 10 files changed, 484 insertions(+), 26 deletions(-)
+ 10 files changed, 477 insertions(+), 26 deletions(-)
  create mode 100644 ld/testsuite/ld-plugin/lto-binutils.exp
  create mode 100644 ld/testsuite/ld-plugin/strip-1a-fat.c
  create mode 100644 ld/testsuite/ld-plugin/strip-1a-fat.rd
@@ -66,7 +66,7 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  create mode 100644 ld/testsuite/ld-plugin/strip-1b.c
 
 diff --git a/binutils/doc/binutils.texi b/binutils/doc/binutils.texi
-index c74526e929a..05a10d20924 100644
+index 7f041d9deda..d094f7d7091 100644
 --- a/binutils/doc/binutils.texi
 +++ b/binutils/doc/binutils.texi
 @@ -3566,6 +3566,7 @@ strip [@option{-F} @var{bfdname} |@option{--target=}@var{bfdname}]
@@ -105,7 +105,7 @@ index c74526e929a..05a10d20924 100644
  @itemx --version
  Show the version number for @command{strip}.
 diff --git a/binutils/objcopy.c b/binutils/objcopy.c
-index 31933e13b7a..1396dd10bbe 100644
+index 31933e13b7a..9ae6830dff3 100644
 --- a/binutils/objcopy.c
 +++ b/binutils/objcopy.c
 @@ -30,6 +30,8 @@
@@ -117,17 +117,19 @@ index 31933e13b7a..1396dd10bbe 100644
  
  /* FIXME: See bfd/peXXigen.c for why we include an architecture specific
     header in generic PE code.  */
-@@ -165,6 +167,9 @@ static struct section_list *change_sections;
+@@ -165,6 +167,11 @@ static struct section_list *change_sections;
  /* TRUE if some sections are to be removed.  */
  static bool sections_removed;
  
++#if BFD_SUPPORTS_PLUGINS
 +/* TRUE if all GCC LTO sections are to be removed.  */
 +static bool lto_sections_removed;
++#endif
 +
  /* TRUE if only some sections are to be copied.  */
  static bool sections_copied;
  
-@@ -359,6 +364,7 @@ enum command_line_switch
+@@ -359,6 +366,7 @@ enum command_line_switch
    OPTION_RENAME_SECTION,
    OPTION_REVERSE_BYTES,
    OPTION_PE_SECTION_ALIGNMENT,
@@ -135,7 +137,7 @@ index 31933e13b7a..1396dd10bbe 100644
    OPTION_SET_SECTION_FLAGS,
    OPTION_SET_SECTION_ALIGNMENT,
    OPTION_SET_START,
-@@ -402,6 +408,7 @@ static struct option strip_options[] =
+@@ -402,6 +410,7 @@ static struct option strip_options[] =
    {"output-file", required_argument, 0, 'o'},
    {"output-format", required_argument, 0, 'O'},	/* Obsolete */
    {"output-target", required_argument, 0, 'O'},
@@ -143,7 +145,7 @@ index 31933e13b7a..1396dd10bbe 100644
    {"preserve-dates", no_argument, 0, 'p'},
    {"remove-section", required_argument, 0, 'R'},
    {"remove-relocations", required_argument, 0, OPTION_REMOVE_RELOCS},
-@@ -758,6 +765,10 @@ strip_usage (FILE *stream, int exit_status)
+@@ -758,6 +767,10 @@ strip_usage (FILE *stream, int exit_status)
       --info                        List object formats & architectures supported\n\
    -o <file>                        Place stripped output into <file>\n\
  "));
@@ -154,7 +156,7 @@ index 31933e13b7a..1396dd10bbe 100644
  
    list_supported_targets (program_name, stream);
    if (REPORT_BUGS_TO[0] && exit_status == 0)
-@@ -1916,20 +1927,11 @@ add_redefine_syms_file (const char *filename)
+@@ -1916,20 +1929,11 @@ add_redefine_syms_file (const char *filename)
     Returns TRUE upon success, FALSE otherwise.  */
  
  static bool
@@ -165,18 +167,18 @@ index 31933e13b7a..1396dd10bbe 100644
    bfd_size_type tocopy;
 -  off_t size;
 -  struct stat buf;
- 
+-
 -  if (bfd_stat_arch_elt (ibfd, &buf) != 0)
 -    {
 -      bfd_nonfatal_message (NULL, ibfd, NULL, NULL);
 -      return false;
 -    }
--
+ 
 -  size = buf.st_size;
    if (size < 0)
      {
        non_fatal (_("stat returns negative size for `%s'"),
-@@ -1974,11 +1976,40 @@ copy_unknown_object (bfd *ibfd, bfd *obfd)
+@@ -1974,11 +1978,31 @@ copy_unknown_object (bfd *ibfd, bfd *obfd)
  
    /* We should at least to be able to read it back when copying an
       unknown object in an archive.  */
@@ -192,7 +194,6 @@ index 31933e13b7a..1396dd10bbe 100644
 +static bool
 +copy_unknown_object (bfd *ibfd, bfd *obfd)
 +{
-+  off_t size;
 +  struct stat buf;
 +
 +  if (bfd_stat_arch_elt (ibfd, &buf) != 0)
@@ -201,15 +202,7 @@ index 31933e13b7a..1396dd10bbe 100644
 +      return false;
 +    }
 +
-+  size = buf.st_size;
-+  if (size < 0)
-+    {
-+      non_fatal (_("stat returns negative size for `%s'"),
-+		 bfd_get_archive_filename (ibfd));
-+      return false;
-+    }
-+
-+  if (!copy_unknown_file (ibfd, obfd, size, buf.st_mode))
++  if (!copy_unknown_file (ibfd, obfd, buf.st_size, buf.st_mode))
 +    return false;
 +
 +  return true;
@@ -218,7 +211,7 @@ index 31933e13b7a..1396dd10bbe 100644
  typedef struct objcopy_internal_note
  {
    Elf_Internal_Note  note;
-@@ -3744,7 +3775,10 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
+@@ -3744,7 +3768,10 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
  	  goto cleanup_and_exit;
  	}
  
@@ -230,7 +223,7 @@ index 31933e13b7a..1396dd10bbe 100644
  	{
  	  ok = copy_object (this_element, output_element, input_arch);
  
-@@ -3845,6 +3879,7 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+@@ -3845,6 +3872,7 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
    char **obj_matching;
    char **core_matching;
    off_t size = get_file_size (input_filename);
@@ -238,7 +231,7 @@ index 31933e13b7a..1396dd10bbe 100644
  
    if (size < 1)
      {
-@@ -3855,9 +3890,16 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+@@ -3855,9 +3883,16 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
        return;
      }
  
@@ -256,7 +249,7 @@ index 31933e13b7a..1396dd10bbe 100644
    if (ibfd == NULL || bfd_stat (ibfd, in_stat) != 0)
      {
        bfd_nonfatal_message (input_filename, NULL, NULL, NULL);
-@@ -3974,17 +4016,29 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+@@ -3974,17 +4009,29 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
   	  return;
   	}
  
@@ -296,7 +289,7 @@ index 31933e13b7a..1396dd10bbe 100644
  	}
  
        if (!bfd_close (ibfd))
-@@ -4837,6 +4891,10 @@ strip_main (int argc, char *argv[])
+@@ -4837,6 +4884,10 @@ strip_main (int argc, char *argv[])
    char *output_file = NULL;
    bool merge_notes_set = false;
  
@@ -307,7 +300,7 @@ index 31933e13b7a..1396dd10bbe 100644
    while ((c = getopt_long (argc, argv, "I:O:F:K:MN:R:o:sSpdgxXHhVvwDU",
  			   strip_options, (int *) 0)) != EOF)
      {
-@@ -4927,6 +4985,13 @@ strip_main (int argc, char *argv[])
+@@ -4927,6 +4978,13 @@ strip_main (int argc, char *argv[])
  	case OPTION_KEEP_SECTION_SYMBOLS:
  	  keep_section_symbols = true;
  	  break;
@@ -321,7 +314,7 @@ index 31933e13b7a..1396dd10bbe 100644
  	case 0:
  	  /* We've been given a long option.  */
  	  break;
-@@ -4971,6 +5036,14 @@ strip_main (int argc, char *argv[])
+@@ -4971,6 +5029,14 @@ strip_main (int argc, char *argv[])
    if (output_target == NULL)
      output_target = input_target;
  
@@ -338,7 +331,7 @@ index 31933e13b7a..1396dd10bbe 100644
        || (output_file != NULL && (i + 1) < argc))
 diff --git a/ld/testsuite/ld-plugin/lto-binutils.exp b/ld/testsuite/ld-plugin/lto-binutils.exp
 new file mode 100644
-index 00000000000..c475d42b728
+index 00000000000..db18a63a7b5
 --- /dev/null
 +++ b/ld/testsuite/ld-plugin/lto-binutils.exp
 @@ -0,0 +1,341 @@
@@ -653,9 +646,9 @@ index 00000000000..c475d42b728
 +	"tmpdir/strip-1a-fat-s.o" \
 +    ] \
 +    [list \
-+	"Build strip-1f" \
++	"Build strip-1f (libstrip-1a-fat-s.a)" \
 +	"" \
-+	"-O2 -flto $lto_fat (libstrip-1a-fat-s.a)" \
++	"-O2 -flto $lto_fat" \
 +	{ strip-1b-fat.c } \
 +	{} \
 +	"libstrip-1f" \
@@ -788,3 +781,4 @@ index 96152718d6f..119410bc523 100644
  	    if { $check_ld(source) == "regexp" } then {
 -- 
 2.49.0
+
