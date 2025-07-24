@@ -1,8 +1,9 @@
-https://sourceware.org/bugzilla/show_bug.cgi?id=33198#c11
+https://inbox.sourceware.org/binutils/20250724035840.2641495-1-hjl.tools@gmail.com/
 
-From fd317c8f4caf6147865e664e1f07f8f2465752a1 Mon Sep 17 00:00:00 2001
+From 080651084a14bee1bcc5f0fcfa7071d1428cd6c6 Mon Sep 17 00:00:00 2001
+Message-ID: <080651084a14bee1bcc5f0fcfa7071d1428cd6c6.1753329792.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
-Date: Tue, 22 Jul 2025 14:09:48 -0700
+Date: Wed, 23 Jul 2025 20:58:40 -0700
 Subject: [PATCH] strip: Properly handle LLVM IR bitcode
 
 commit 717a38e9a02109fcbcb18bb2ec3aa251e2ad0a0d
@@ -499,7 +500,7 @@ index 05c73047b60..ab1aa50a9a1 100644
 +run_pr33198_test "" "-R .llvm.lto"
 +run_pr33198_test "-fat" "-R .llvm.lto"
 diff --git a/binutils/testsuite/lib/binutils-common.exp b/binutils/testsuite/lib/binutils-common.exp
-index b73b5558c27..2d72b77600b 100644
+index b73b5558c27..7297f6d29d3 100644
 --- a/binutils/testsuite/lib/binutils-common.exp
 +++ b/binutils/testsuite/lib/binutils-common.exp
 @@ -1811,3 +1811,30 @@ proc get_standard_section_names {} {
@@ -521,7 +522,7 @@ index b73b5558c27..2d72b77600b 100644
 +	    set llvm_plug_opt "--plugin $llvm_plug_so"
 +	}
 +
-+	if { $llvm_plug_so eq "" } then {
++	if { $llvm_plug_opt eq "" } then {
 +	    # If it is still blank, try llvm-config --libdir.  Clang
 +	    # searches CLANG_INSTALL_LIBDIR_BASENAME which corresponds
 +	    # to this.
@@ -533,5 +534,8 @@ index b73b5558c27..2d72b77600b 100644
 +	}
 +    }
 +}
+
+base-commit: 673c91580993bc285d75aca2340ae172c7030953
 -- 
 2.50.1
+
