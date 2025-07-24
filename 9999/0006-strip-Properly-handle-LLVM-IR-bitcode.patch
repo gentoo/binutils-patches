@@ -1,6 +1,6 @@
-https://sourceware.org/bugzilla/show_bug.cgi?id=33198#c2
+https://sourceware.org/bugzilla/show_bug.cgi?id=33198#c11
 
-From 252058908602dc41b2e483e663aba211395c5c9d Mon Sep 17 00:00:00 2001
+From fd317c8f4caf6147865e664e1f07f8f2465752a1 Mon Sep 17 00:00:00 2001
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Tue, 22 Jul 2025 14:09:48 -0700
 Subject: [PATCH] strip: Properly handle LLVM IR bitcode
@@ -59,6 +59,9 @@ binutils/
 	* testsuite/binutils-all/x86-64/x86-64.exp (run_pr33198_test):
 	New.
 	Run binutils/33198 tests.
+	* testsuite/lib/binutils-common.exp (llvm_plug_opt): New.
+	(CLANG_FOR_TARGET): New.  Set to "clang" for native build if
+	"clang -v" reports "clang version".
 
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
@@ -67,8 +70,8 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  binutils/objcopy.c                            |  40 +++--
  .../testsuite/binutils-all/x86-64/pr33198.c   |   4 +
  .../testsuite/binutils-all/x86-64/x86-64.exp  | 158 ++++++++++++++++++
- binutils/testsuite/lib/binutils-common.exp    |  16 ++
- 6 files changed, 288 insertions(+), 21 deletions(-)
+ binutils/testsuite/lib/binutils-common.exp    |  27 +++
+ 6 files changed, 299 insertions(+), 21 deletions(-)
  create mode 100644 binutils/testsuite/binutils-all/x86-64/pr33198.c
 
 diff --git a/bfd/bfd-in2.h b/bfd/bfd-in2.h
@@ -496,10 +499,10 @@ index 05c73047b60..ab1aa50a9a1 100644
 +run_pr33198_test "" "-R .llvm.lto"
 +run_pr33198_test "-fat" "-R .llvm.lto"
 diff --git a/binutils/testsuite/lib/binutils-common.exp b/binutils/testsuite/lib/binutils-common.exp
-index b73b5558c27..d3a73337762 100644
+index b73b5558c27..2d72b77600b 100644
 --- a/binutils/testsuite/lib/binutils-common.exp
 +++ b/binutils/testsuite/lib/binutils-common.exp
-@@ -1811,3 +1811,19 @@ proc get_standard_section_names {} {
+@@ -1811,3 +1811,30 @@ proc get_standard_section_names {} {
      }
      return
  }
@@ -516,6 +519,17 @@ index b73b5558c27..d3a73337762 100644
 +	set llvm_plug_so [string trim [exec $CLANG_FOR_TARGET -print-file-name=LLVMgold.so]]
 +	if { $llvm_plug_so ne "LLVMgold.so" } then {
 +	    set llvm_plug_opt "--plugin $llvm_plug_so"
++	}
++
++	if { $llvm_plug_so eq "" } then {
++	    # If it is still blank, try llvm-config --libdir.  Clang
++	    # searches CLANG_INSTALL_LIBDIR_BASENAME which corresponds
++	    # to this.
++	    catch "exec llvm-config --libdir" got
++	    if {[file isdirectory $got] \
++		&& [file isfile $got/LLVMgold.so]} then {
++		set llvm_plug_opt "--plugin $got/LLVMgold.so"
++	    }
 +	}
 +    }
 +}
