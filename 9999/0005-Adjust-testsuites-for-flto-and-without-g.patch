@@ -1,8 +1,7 @@
-From f22ea3e751a11ab8cfb5524468d97a998cca0325 Mon Sep 17 00:00:00 2001
-Message-ID: <f22ea3e751a11ab8cfb5524468d97a998cca0325.1741810888.git.sam@gentoo.org>
+From 3d6a0b4a3f6b0582781979062cc6730e858997ae Mon Sep 17 00:00:00 2001
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Mon, 10 Mar 2025 17:07:16 -0700
-Subject: [PATCH] Adjust testsuites for -flto and without -g
+Subject: [PATCH 5/5] Adjust testsuites for -flto and without -g
 
 Adjust testsuites for binutils built with -flto and without -g:
 
@@ -50,16 +49,14 @@ libctf/
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
  binutils/testsuite/binutils-all/objcopy.exp | 14 +++++++++++---
- gprof/testsuite/Makefile.am                 | 10 +++++-----
- gprof/testsuite/Makefile.in                 | 12 +++++-------
  ld/testsuite/ld-ctf/ctf.exp                 |  5 +++++
  libctf/Makefile.am                          |  3 ++-
  libctf/Makefile.in                          |  3 ++-
  libctf/testsuite/lib/ctf-lib.exp            | 14 ++++++++++++--
- 7 files changed, 42 insertions(+), 19 deletions(-)
+ 5 files changed, 32 insertions(+), 7 deletions(-)
 
 diff --git a/binutils/testsuite/binutils-all/objcopy.exp b/binutils/testsuite/binutils-all/objcopy.exp
-index a706efbba18..42a29927a5d 100644
+index 6aa6d2d9fe7..9371d928d60 100644
 --- a/binutils/testsuite/binutils-all/objcopy.exp
 +++ b/binutils/testsuite/binutils-all/objcopy.exp
 @@ -36,6 +36,11 @@ if ![is_remote host] {
@@ -100,7 +97,7 @@ index a706efbba18..42a29927a5d 100644
  	untested $test
  	return
      }
-@@ -1381,10 +1388,11 @@ proc objcopy_test_without_global_symbol { } {
+@@ -1462,10 +1469,11 @@ proc objcopy_test_without_global_symbol { } {
      global OBJDUMPFLAGS
      global srcdir
      global subdir
@@ -134,10 +131,10 @@ index c314f2995af..08b47d2db18 100644
 +
 +set CFLAGS_FOR_TARGET "$old_CFLAGS"
 diff --git a/libctf/Makefile.am b/libctf/Makefile.am
-index 6e136220497..bf214d8a000 100644
+index 12301277275..26980667cc3 100644
 --- a/libctf/Makefile.am
 +++ b/libctf/Makefile.am
-@@ -102,11 +102,12 @@ check-DEJAGNU: site.exp development.exp
+@@ -114,11 +114,12 @@ check-DEJAGNU: site.exp development.exp
  	else \
  	  TEST_CROSS=yes; \
  	fi; \
@@ -152,10 +149,10 @@ index 6e136220497..bf214d8a000 100644
  	else echo "WARNING: could not find \`runtest'" 1>&2; :;\
  	fi
 diff --git a/libctf/Makefile.in b/libctf/Makefile.in
-index 5d9587766dc..e5bb94c681b 100644
+index 639d7147b02..812134c70c9 100644
 --- a/libctf/Makefile.in
 +++ b/libctf/Makefile.in
-@@ -1819,11 +1819,12 @@ check-DEJAGNU: site.exp development.exp
+@@ -1826,11 +1826,12 @@ check-DEJAGNU: site.exp development.exp
  	else \
  	  TEST_CROSS=yes; \
  	fi; \
@@ -208,8 +205,6 @@ index 64d2a40ad9f..6d3b75e22a2 100644
  
  	if { $comp_output != ""} {
  	    send_log "compilation of CTF program [concat $src] failed with <$comp_output>"
-
-base-commit: add96080cf9e460afe478cfad489d7f22ab10678
 -- 
-2.48.1
+2.49.1
 

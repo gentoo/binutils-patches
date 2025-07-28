@@ -1,4 +1,4 @@
-From 225a5f5b9f40c1f335146ec882bd5517e4573f62 Mon Sep 17 00:00:00 2001
+From ef7b999d6d7748f0b6e159df52b4b663e5032072 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 24 Jul 2021 15:20:16 +0200
 Subject: [PATCH 3/5] Gentoo: Give also libctf optionally a gentoo-specific
@@ -12,7 +12,7 @@ Subject: [PATCH 3/5] Gentoo: Give also libctf optionally a gentoo-specific
  4 files changed, 62 insertions(+), 2 deletions(-)
 
 diff --git a/libctf/Makefile.am b/libctf/Makefile.am
-index fb1a306c888..5fcc73bd04e 100644
+index 6e136220497..12301277275 100644
 --- a/libctf/Makefile.am
 +++ b/libctf/Makefile.am
 @@ -31,6 +31,9 @@ info_TEXINFOS =
@@ -45,7 +45,7 @@ index fb1a306c888..5fcc73bd04e 100644
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c ctf-decl.c ctf-error.c \
 diff --git a/libctf/Makefile.in b/libctf/Makefile.in
-index 54f5daa79ee..b7a80edfab6 100644
+index 5d9587766dc..639d7147b02 100644
 --- a/libctf/Makefile.in
 +++ b/libctf/Makefile.in
 @@ -430,6 +430,7 @@ AUTOCONF = @AUTOCONF@
@@ -150,7 +150,7 @@ index 7466d56a18b..54c86592b70 100755
  if test -z "${NEED_CTF_QSORT_R_TRUE}" && test -z "${NEED_CTF_QSORT_R_FALSE}"; then
    as_fn_error $? "conditional \"NEED_CTF_QSORT_R\" was never defined.
 diff --git a/libctf/configure.ac b/libctf/configure.ac
-index 64544b83a9f..1ce43327c25 100644
+index fbd8ec12a14..3e83f43ba13 100644
 --- a/libctf/configure.ac
 +++ b/libctf/configure.ac
 @@ -76,6 +76,16 @@ if test "${enable_libctf_hash_debugging}" = yes; then
@@ -171,5 +171,5 @@ index 64544b83a9f..1ce43327c25 100644
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
 -- 
-2.44.2
+2.49.1
 

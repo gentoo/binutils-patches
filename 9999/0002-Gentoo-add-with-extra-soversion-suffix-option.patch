@@ -1,4 +1,4 @@
-From 87a5dd82a8e08967694943e866aa9b26c4fc6a63 Mon Sep 17 00:00:00 2001
+From 062144ba260931e309a621355b92a2ca3b1ec12c Mon Sep 17 00:00:00 2001
 From: Sergei Trofimovich <slyfox@gentoo.org>
 Date: Tue, 20 Jul 2021 21:12:38 +0200
 Subject: [PATCH 2/5] Gentoo: add --with-extra-soversion-suffix= option
@@ -29,12 +29,12 @@ Ported to binutils 2.37 by Andreas K. Hüttel <dilfridge@gentoo.org>
 ---
  bfd/Makefile.am  |  5 +++++
  bfd/Makefile.in  |  4 ++++
- bfd/configure    | 13 +++++++++++++
+ bfd/configure    | 17 +++++++++++++++--
  bfd/configure.ac |  7 +++++++
- 4 files changed, 29 insertions(+)
+ 4 files changed, 31 insertions(+), 2 deletions(-)
 
 diff --git a/bfd/Makefile.am b/bfd/Makefile.am
-index 0dc733eaba9..5bd636d931a 100644
+index 4987ac9cccc..23de1c6b5d7 100644
 --- a/bfd/Makefile.am
 +++ b/bfd/Makefile.am
 @@ -64,6 +64,8 @@ bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
@@ -46,7 +46,7 @@ index 0dc733eaba9..5bd636d931a 100644
  # bfd.h goes here, for now
  BFD_H = bfd.h
  
-@@ -999,6 +1001,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+@@ -995,6 +997,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
  	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
  	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
  	fi ;\
@@ -57,10 +57,10 @@ index 0dc733eaba9..5bd636d931a 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/Makefile.in b/bfd/Makefile.in
-index b3d97d478ea..38209d1b234 100644
+index 8a670ad1d05..2218f61e604 100644
 --- a/bfd/Makefile.in
 +++ b/bfd/Makefile.in
-@@ -348,6 +348,7 @@ ECHO_T = @ECHO_T@
+@@ -347,6 +347,7 @@ ECHO_T = @ECHO_T@
  EGREP = @EGREP@
  EXEEXT = @EXEEXT@
  EXEEXT_FOR_BUILD = @EXEEXT_FOR_BUILD@
@@ -68,7 +68,7 @@ index b3d97d478ea..38209d1b234 100644
  FGREP = @FGREP@
  GENCAT = @GENCAT@
  GMSGFMT = @GMSGFMT@
-@@ -2471,6 +2472,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+@@ -2464,6 +2465,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
  	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
  	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
  	fi ;\
@@ -79,7 +79,7 @@ index b3d97d478ea..38209d1b234 100644
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
 diff --git a/bfd/configure b/bfd/configure
-index 83cb19c7015..a60c76319b9 100755
+index 86561b30ac4..317c2f44982 100755
 --- a/bfd/configure
 +++ b/bfd/configure
 @@ -701,6 +701,7 @@ WARN_CFLAGS
@@ -88,9 +88,9 @@ index 83cb19c7015..a60c76319b9 100755
  PKGVERSION
 +EXTRA_SOVERSION_SUFFIX
  DEBUGDIR
- ENABLE_BFD_64_BIT_FALSE
- ENABLE_BFD_64_BIT_TRUE
-@@ -842,6 +843,7 @@ enable_secureplt
+ PLUGINS_FALSE
+ PLUGINS_TRUE
+@@ -840,6 +841,7 @@ enable_secureplt
  enable_separate_code
  enable_leading_mingw64_underscores
  with_separate_debug_dir
@@ -98,16 +98,34 @@ index 83cb19c7015..a60c76319b9 100755
  with_pkgversion
  with_bugurl
  enable_werror
-@@ -1530,6 +1532,8 @@ Optional Packages:
+@@ -1528,6 +1530,8 @@ Optional Packages:
    --with-separate-debug-dir=DIR
                            Look for global separate debug info in DIR
                            [[default=LIBDIR/debug]]
 +  --with-extra-soversion-suffix=SUFFIX
-+                          Append '.SUFFIX' to SONAME [default=]
++                          Append '.SUFFIX' to SONAME [[default=]]
    --with-pkgversion=PKG   Use PKG in the version string in place of "GNU
                            Binutils"
    --with-bugurl=URL       Direct users to URL to report a bug
-@@ -12082,6 +12086,15 @@ fi
+@@ -11153,7 +11157,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11156 "configure"
++#line 11160 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -11259,7 +11263,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11262 "configure"
++#line 11266 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -12030,6 +12034,15 @@ fi
  
  
  
@@ -124,10 +142,10 @@ index 83cb19c7015..a60c76319b9 100755
  
  # Check whether --with-pkgversion was given.
 diff --git a/bfd/configure.ac b/bfd/configure.ac
-index 6bcfd1b7368..dde0a3af03e 100644
+index 5879a04785d..3e40e9476a7 100644
 --- a/bfd/configure.ac
 +++ b/bfd/configure.ac
-@@ -167,6 +167,13 @@ AC_ARG_WITH(separate-debug-dir,
+@@ -173,6 +173,13 @@ AC_ARG_WITH(separate-debug-dir,
  [DEBUGDIR="${withval}"])
  AC_SUBST(DEBUGDIR)
  
@@ -142,5 +160,5 @@ index 6bcfd1b7368..dde0a3af03e 100644
  ACX_BUGURL([https://sourceware.org/bugzilla/])
  
 -- 
-2.44.2
+2.49.1
 

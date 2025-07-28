@@ -1,7 +1,7 @@
-From 24694fe84ea1ac172f709bd1b079ebb996e4feb9 Mon Sep 17 00:00:00 2001
+From 845089ce66869d79e86869ec1972a33036010706 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Wed, 22 Feb 2023 20:05:35 +0100
-Subject: [PATCH 5/5] Apply a similar libiberty fix as in 7d53105d for
+Subject: [PATCH 4/5] Apply a similar libiberty fix as in 7d53105d for
  libopcodes and libgprofng
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -18,7 +18,7 @@ Signed-off-by: Andreas K. Hüttel <dilfridge@gentoo.org>
  4 files changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/gprofng/src/Makefile.am b/gprofng/src/Makefile.am
-index fb4b8a0fafa..3d7cb18ff71 100644
+index f6d3f5da759..36c334bb359 100644
 --- a/gprofng/src/Makefile.am
 +++ b/gprofng/src/Makefile.am
 @@ -144,7 +144,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
@@ -32,7 +32,7 @@ index fb4b8a0fafa..3d7cb18ff71 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/gprofng/src/Makefile.in b/gprofng/src/Makefile.in
-index cef4b275305..295fd3ee2df 100644
+index 0cdd4443670..8021b2d4a3d 100644
 --- a/gprofng/src/Makefile.in
 +++ b/gprofng/src/Makefile.in
 @@ -552,7 +552,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
@@ -46,10 +46,10 @@ index cef4b275305..295fd3ee2df 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/opcodes/configure b/opcodes/configure
-index 0075b6dc0ef..76fca3e9246 100755
+index 3dd6b692f89..54544895689 100755
 --- a/opcodes/configure
 +++ b/opcodes/configure
-@@ -14379,10 +14379,10 @@ if test "$enable_shared" = "yes"; then
+@@ -13881,10 +13881,10 @@ if test "$enable_shared" = "yes"; then
    case "${host}" in
      *-*-cygwin*)
        SHARED_LDFLAGS="-no-undefined"
@@ -63,7 +63,7 @@ index 0075b6dc0ef..76fca3e9246 100755
        ;;
    esac
 diff --git a/opcodes/configure.ac b/opcodes/configure.ac
-index 4d918e3ef9b..9692e69693e 100644
+index e31ddde9e57..8fdf538ecf8 100644
 --- a/opcodes/configure.ac
 +++ b/opcodes/configure.ac
 @@ -195,10 +195,10 @@ if test "$enable_shared" = "yes"; then
@@ -80,5 +80,5 @@ index 4d918e3ef9b..9692e69693e 100644
        ;;
    esac
 -- 
-2.44.2
+2.49.1
 
