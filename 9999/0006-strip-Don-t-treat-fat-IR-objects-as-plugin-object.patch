@@ -1,6 +1,6 @@
-https://sourceware.org/bugzilla/show_bug.cgi?id=33246#c14
+https://sourceware.org/bugzilla/show_bug.cgi?id=33246#c24
 
-From a3f9e4f1e527f3908aeb2f41d85be8e17dbe9eb8 Mon Sep 17 00:00:00 2001
+From 3f4cd3fcdc566dce8ef7d978d328817428acbe63 Mon Sep 17 00:00:00 2001
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Sun, 3 Aug 2025 10:28:40 -0700
 Subject: [PATCH] strip: Don't treat fat IR objects as plugin object
@@ -372,7 +372,7 @@ index 5774711abe6..496f0a13daa 100644
  
    i = optind;
 diff --git a/ld/testsuite/ld-plugin/lto-binutils.exp b/ld/testsuite/ld-plugin/lto-binutils.exp
-index 88d35171045..0609dc608c1 100644
+index 88d35171045..145eb410588 100644
 --- a/ld/testsuite/ld-plugin/lto-binutils.exp
 +++ b/ld/testsuite/ld-plugin/lto-binutils.exp
 @@ -355,3 +355,178 @@ run_cc_link_tests [list \
@@ -392,7 +392,7 @@ index 88d35171045..0609dc608c1 100644
 +    global READELF
 +    global strip
 +
-+    set strip_flags "--strip-debug"
++    set strip_flags "--strip-debug --disable-deterministic-archives"
 +
 +    set test pr33246
 +    set testname "${test}${llvm}${fat} with $strip_flags"
