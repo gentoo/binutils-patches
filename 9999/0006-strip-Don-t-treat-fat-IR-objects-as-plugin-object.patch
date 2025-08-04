@@ -1,26 +1,24 @@
-https://sourceware.org/bugzilla/show_bug.cgi?id=33246#c12
+https://sourceware.org/bugzilla/show_bug.cgi?id=33246#c14
 
-From 4ef8b87fc5466a0b3cb162dfacfc0ffefd90670c Mon Sep 17 00:00:00 2001
+From a3f9e4f1e527f3908aeb2f41d85be8e17dbe9eb8 Mon Sep 17 00:00:00 2001
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Sun, 3 Aug 2025 10:28:40 -0700
-Subject: [PATCH] strip: Don't use plugin on fat IR objects
+Subject: [PATCH] strip: Don't treat fat IR objects as plugin object
 
 Fat IR objects contains both regular sections and IR sections.  After
 
-717a38e9a02109fcbcb18bb2ec3aa251e2ad0a0d is the first bad commit
-commit 717a38e9a02109fcbcb18bb2ec3aa251e2ad0a0d (HEAD)
+commit 717a38e9a02109fcbcb18bb2ec3aa251e2ad0a0d
 Author: H.J. Lu <hjl.tools@gmail.com>
 Date:   Sun May 4 05:12:46 2025 +0800
 
     strip: Add GCC LTO IR support
 
 "strip --strip-debug" no longer strips debug sections in fat IR objects
-since fat IR objects are copied as unknown objects.  When called from
-strip, don't treat archive member nor standalone fat IR object as an IR
-object.  For archive member, it will be copied as an unknown object if
-it isn't a fat IR object.  For standalone fat IR object, it will be
-copied as non-IR object.  Debug sections and IR sections can be removed
-by strip as usual.
+since fat IR objects are recognized as plugin object and copied as unknown
+objects.  Update strip not to treat archive member nor standalone fat IR
+object as IR object so that strip can remove debug and IR sections in
+fat IR object.  For archive member, it is copied as an unknown object if
+it isn't a fat IR object or a slim IR object.
 
 bfd/
 
@@ -37,8 +35,9 @@ bfd/
 	set LTO type to lto_fat_ir_object.
 	(bfd_check_format_matches_lto): Add a bool argument to indicate
 	called from strip.  When called from strip, don't treat archive
-	member nor standalone fat IR object as an IR object.  Set LTO
-	type if IR sections won't be removed.
+	member nor standalone fat IR object as an IR object.  Don't set
+	LTO type when setting format.  Set LTO type if IR sections won't
+	be removed.
 	(bfd_check_format_matches): Updated.
 	* plugin.c (bfd_plugin_get_symbols_in_object_only): Copy LTO
 	type derived from input sections.
@@ -50,7 +49,8 @@ nm/
 	the plugin target is in use.
 	(display_rel_file): Likewise.
 	* objcopy.c (copy_archive): Pass true to bfd_check_format_lto
-	to indicat called from strip.
+	to indicat called from strip.  Also copy slim IR archive member
+	as unknown object.
 	(copy_file): Call bfd_check_format_lto, instead of
 	bfd_check_format.  Pass true to bfd_check_format_lto and
 	bfd_check_format_matches_lto.
@@ -68,13 +68,13 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
  bfd/archive.c                           |  10 +-
  bfd/bfd-in2.h                           |   5 +-
- bfd/format.c                            |  43 +++++--
+ bfd/format.c                            |  48 +++++--
  bfd/plugin.c                            |   3 +
  binutils/nm.c                           |   6 +-
- binutils/objcopy.c                      |  17 ++-
- ld/testsuite/ld-plugin/lto-binutils.exp | 153 ++++++++++++++++++++++++
+ binutils/objcopy.c                      |  21 ++-
+ ld/testsuite/ld-plugin/lto-binutils.exp | 175 ++++++++++++++++++++++++
  ld/testsuite/ld-plugin/pr33246.c        |   4 +
- 8 files changed, 222 insertions(+), 19 deletions(-)
+ 8 files changed, 248 insertions(+), 24 deletions(-)
  create mode 100644 ld/testsuite/ld-plugin/pr33246.c
 
 diff --git a/bfd/archive.c b/bfd/archive.c
@@ -134,7 +134,7 @@ index 2ff3e930bfa..351c9a97c52 100644
  bool bfd_check_format_matches
     (bfd *abfd, bfd_format format, char ***matching);
 diff --git a/bfd/format.c b/bfd/format.c
-index f3a0774af08..ea827bf3001 100644
+index f3a0774af08..bc7a5bc2cac 100644
 --- a/bfd/format.c
 +++ b/bfd/format.c
 @@ -60,7 +60,8 @@ FUNCTION
@@ -217,7 +217,19 @@ index f3a0774af08..ea827bf3001 100644
  {
    extern const bfd_target binary_vec;
    const bfd_target * const *target;
-@@ -537,7 +549,16 @@ bfd_check_format_matches_lto (bfd *abfd, bfd_format format,
+@@ -481,10 +493,7 @@ bfd_check_format_matches_lto (bfd *abfd, bfd_format format,
+     }
+ 
+   if (abfd->format != bfd_unknown)
+-    {
+-      bfd_set_lto_type (abfd);
+-      return abfd->format == format;
+-    }
++    return abfd->format == format;
+ 
+   if (matching != NULL || *bfd_associated_vector != NULL)
+     {
+@@ -537,7 +546,16 @@ bfd_check_format_matches_lto (bfd *abfd, bfd_format format,
  
        cleanup = BFD_SEND_FMT (abfd, _bfd_check_format, (abfd));
  
@@ -235,7 +247,7 @@ index f3a0774af08..ea827bf3001 100644
  	goto ok_ret;
  
        /* For a long time the code has dropped through to check all
-@@ -621,6 +642,11 @@ bfd_check_format_matches_lto (bfd *abfd, bfd_format format,
+@@ -621,6 +639,11 @@ bfd_check_format_matches_lto (bfd *abfd, bfd_format format,
  	{
  	  int match_priority = abfd->xvec->match_priority;
  
@@ -247,7 +259,7 @@ index f3a0774af08..ea827bf3001 100644
  	  if (abfd->format != bfd_archive
  	      || (bfd_has_map (abfd)
  		  && bfd_get_error () != bfd_error_wrong_object_format))
-@@ -854,7 +880,8 @@ DESCRIPTION
+@@ -854,7 +877,8 @@ DESCRIPTION
  bool
  bfd_check_format_matches (bfd *abfd, bfd_format format, char ***matching)
  {
@@ -296,7 +308,7 @@ index a5d56311dde..94333042ee2 100644
        report_plugin_err = false;
        non_fatal (_("%s: plugin needed to handle lto object"),
 diff --git a/binutils/objcopy.c b/binutils/objcopy.c
-index 5774711abe6..72ecf2cb2b1 100644
+index 5774711abe6..496f0a13daa 100644
 --- a/binutils/objcopy.c
 +++ b/binutils/objcopy.c
 @@ -3746,7 +3746,7 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
@@ -308,7 +320,18 @@ index 5774711abe6..72ecf2cb2b1 100644
  #else
        ok_object = bfd_check_format (this_element, bfd_object);
  #endif
-@@ -3946,7 +3946,8 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+@@ -3768,7 +3768,9 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
+ 
+ #if BFD_SUPPORTS_PLUGINS
+       /* Copy LTO IR file as unknown object.  */
+-      if (bfd_plugin_target_p (this_element->xvec))
++      if ((!lto_sections_removed
++	   && this_element->lto_type == lto_slim_ir_object)
++	  || bfd_plugin_target_p (this_element->xvec))
+ 	ok_object = false;
+       else
+ #endif
+@@ -3946,7 +3948,8 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
        break;
      }
  
@@ -318,7 +341,7 @@ index 5774711abe6..72ecf2cb2b1 100644
      {
        bool force_output_target;
        bfd *obfd;
-@@ -3994,13 +3995,14 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
+@@ -3994,13 +3997,14 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
  	      removed.  Try with plugin target next if ignoring plugin
  	      target fails to match the format.  */
  	   bfd_check_format_matches_lto (ibfd, bfd_object, &obj_matching,
@@ -336,7 +359,7 @@ index 5774711abe6..72ecf2cb2b1 100644
  #endif
  	   )
      {
-@@ -5066,6 +5068,11 @@ strip_main (int argc, char *argv[])
+@@ -5066,6 +5070,11 @@ strip_main (int argc, char *argv[])
  					       SECTION_CONTEXT_REMOVE)
  			  || !!find_section_list (".llvm.lto", false,
  					       SECTION_CONTEXT_REMOVE));
@@ -349,10 +372,10 @@ index 5774711abe6..72ecf2cb2b1 100644
  
    i = optind;
 diff --git a/ld/testsuite/ld-plugin/lto-binutils.exp b/ld/testsuite/ld-plugin/lto-binutils.exp
-index 88d35171045..9d19aa0c57e 100644
+index 88d35171045..0609dc608c1 100644
 --- a/ld/testsuite/ld-plugin/lto-binutils.exp
 +++ b/ld/testsuite/ld-plugin/lto-binutils.exp
-@@ -355,3 +355,156 @@ run_cc_link_tests [list \
+@@ -355,3 +355,178 @@ run_cc_link_tests [list \
  	"tmpdir/libstrip-1b-fat-s.a" \
      ] \
  ]
@@ -452,6 +475,17 @@ index 88d35171045..9d19aa0c57e 100644
 +	    fail "$testname (strip $obj)"
 +	    return
 +	}
++    } else {
++	set cmd "cmp $obj ${obj}.strip"
++	send_log "$cmd\n"
++	verbose "$cmd" 1
++	catch "exec $cmd" got
++	if ![string match "" $got] then {
++	    send_log "$got\n"
++	    verbose "$got" 1
++	    fail "$testname (strip $obj)"
++	    return
++	}
 +    }
 +
 +    pass "$testname (strip $obj)"
@@ -495,6 +529,17 @@ index 88d35171045..9d19aa0c57e 100644
 +	verbose "$cmd" 1
 +	catch "exec $cmd" got
 +	if [regexp " \.debug_" $got] then {
++	    send_log "$got\n"
++	    verbose "$got" 1
++	    fail "$testname (strip $archive)"
++	    return
++	}
++    } else {
++	set cmd "cmp $archive ${archive}.strip"
++	send_log "$cmd\n"
++	verbose "$cmd" 1
++	catch "exec $cmd" got
++	if ![string match "" $got] then {
 +	    send_log "$got\n"
 +	    verbose "$got" 1
 +	    fail "$testname (strip $archive)"
