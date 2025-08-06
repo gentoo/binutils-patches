@@ -1,9 +1,9 @@
-https://inbox.sourceware.org/binutils/20250806010532.3404344-1-hjl.tools@gmail.com/
+https://inbox.sourceware.org/binutils/20250806040426.3697458-1-hjl.tools@gmail.com/T/#u
 
-From e48e12720aa4a7c3f97d70dc0d64e5ac665ccdd5 Mon Sep 17 00:00:00 2001
-Message-ID: <e48e12720aa4a7c3f97d70dc0d64e5ac665ccdd5.1754442448.git.sam@gentoo.org>
+From 2d6b40ce9b89f5e6b2497071910baab839d8e60b Mon Sep 17 00:00:00 2001
+Message-ID: <2d6b40ce9b89f5e6b2497071910baab839d8e60b.1754453238.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
-Date: Tue, 5 Aug 2025 18:05:32 -0700
+Date: Tue, 5 Aug 2025 21:04:26 -0700
 Subject: [PATCH] strip: Don't treat fat IR objects as plugin object
 
 Fat IR objects contains both regular sections and IR sections.  After
@@ -63,20 +63,20 @@ ld/
 
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
- bfd/archive.c                           |  12 +-
+ bfd/archive.c                           |  10 ++
  bfd/bfd-in2.h                           |   3 +
  bfd/bfd.c                               |   3 +
- bfd/format.c                            |  22 ++-
+ bfd/format.c                            |  25 +++-
  bfd/plugin.c                            |   3 +
- binutils/nm.c                           |   6 +-
+ binutils/nm.c                           |   9 +-
  binutils/objcopy.c                      |  13 +-
  ld/testsuite/ld-plugin/lto-binutils.exp | 175 ++++++++++++++++++++++++
  ld/testsuite/ld-plugin/pr33246.c        |   4 +
- 9 files changed, 230 insertions(+), 11 deletions(-)
+ 9 files changed, 238 insertions(+), 7 deletions(-)
  create mode 100644 ld/testsuite/ld-plugin/pr33246.c
 
 diff --git a/bfd/archive.c b/bfd/archive.c
-index c61d4b12658..491c44f5191 100644
+index c61d4b12658..697b2ed23f2 100644
 --- a/bfd/archive.c
 +++ b/bfd/archive.c
 @@ -141,6 +141,10 @@ SUBSECTION
@@ -90,25 +90,23 @@ index c61d4b12658..491c44f5191 100644
  
  #ifndef errno
  extern int errno;
-@@ -2342,7 +2346,8 @@ _bfd_compute_and_write_armap (bfd *arch, unsigned int elength)
- 	  long symcount;
+@@ -2343,6 +2347,9 @@ _bfd_compute_and_write_armap (bfd *arch, unsigned int elength)
  	  long src_count;
  
--	  if (bfd_get_lto_type (current) == lto_slim_ir_object
-+	  if (!bfd_plugin_target_p (current->xvec)
-+	      && bfd_get_lto_type (current) == lto_slim_ir_object
+ 	  if (bfd_get_lto_type (current) == lto_slim_ir_object
++#if BFD_SUPPORTS_PLUGINS
++	      && !bfd_plugin_target_p (current->xvec)
++#endif
  	      && report_plugin_err)
  	    {
  	      report_plugin_err = false;
-@@ -2398,8 +2403,9 @@ _bfd_compute_and_write_armap (bfd *arch, unsigned int elength)
- 			  map = new_map;
- 			}
+@@ -2400,6 +2407,9 @@ _bfd_compute_and_write_armap (bfd *arch, unsigned int elength)
  
--		      if (bfd_lto_slim_symbol_p (current,
--						 syms[src_count]->name)
-+		      if (!bfd_plugin_target_p (current->xvec)
-+			  && bfd_lto_slim_symbol_p (current,
-+						    syms[src_count]->name)
+ 		      if (bfd_lto_slim_symbol_p (current,
+ 						 syms[src_count]->name)
++#if BFD_SUPPORTS_PLUGINS
++			  && !bfd_plugin_target_p (current->xvec)
++#endif
  			  && report_plugin_err)
  			{
  			  report_plugin_err = false;
@@ -141,7 +139,7 @@ index 858ab5ce017..4aded6809bb 100644
  .  ENUM_BITFIELD (bfd_plugin_format) plugin_format : 2;
  .
 diff --git a/bfd/format.c b/bfd/format.c
-index d2bc318977c..d883aa5e5a8 100644
+index d2bc318977c..bd9fa8d6c33 100644
 --- a/bfd/format.c
 +++ b/bfd/format.c
 @@ -389,6 +389,11 @@ bfd_set_lto_type (bfd *abfd ATTRIBUTE_UNUSED)
@@ -168,7 +166,7 @@ index d2bc318977c..d883aa5e5a8 100644
  
    if (matching != NULL || *bfd_associated_vector != NULL)
      {
-@@ -510,7 +512,17 @@ bfd_check_format_matches (bfd *abfd, bfd_format format, char ***matching)
+@@ -510,7 +512,20 @@ bfd_check_format_matches (bfd *abfd, bfd_format format, char ***matching)
  
        cleanup = BFD_SEND_FMT (abfd, _bfd_check_format, (abfd));
  
@@ -180,10 +178,13 @@ index d2bc318977c..d883aa5e5a8 100644
 +	 standalone fat IR object, it will be copied as non-IR
 +	 object.  */
 +      if (cleanup
++#if BFD_SUPPORTS_PLUGINS
 +	  && (!abfd->is_strip_input
 +	      || !bfd_plugin_target_p (abfd->xvec)
 +	      || (abfd->lto_type != lto_fat_ir_object
-+		  && abfd->my_archive == NULL)))
++		  && abfd->my_archive == NULL))
++#endif
++	  )
  	goto ok_ret;
  
        /* For a long time the code has dropped through to check all
@@ -202,26 +203,29 @@ index ebdf2505cbc..43ca444e7a1 100644
    else
      {
 diff --git a/binutils/nm.c b/binutils/nm.c
-index a5d56311dde..94333042ee2 100644
+index a5d56311dde..d44083dcc94 100644
 --- a/binutils/nm.c
 +++ b/binutils/nm.c
-@@ -801,7 +801,8 @@ filter_symbols (bfd *abfd, bool is_dynamic, void *minisyms,
-       if (sym == NULL)
+@@ -802,6 +802,9 @@ filter_symbols (bfd *abfd, bool is_dynamic, void *minisyms,
  	continue;
  
--      if (bfd_lto_slim_symbol_p (abfd, sym->name)
-+      if (!bfd_plugin_target_p (abfd->xvec)
-+	  && bfd_lto_slim_symbol_p (abfd, sym->name)
+       if (bfd_lto_slim_symbol_p (abfd, sym->name)
++#if BFD_SUPPORTS_PLUGINS
++	  && !bfd_plugin_target_p (abfd->xvec)
++#endif
  	  && report_plugin_err)
  	{
  	  report_plugin_err = false;
-@@ -1484,7 +1485,8 @@ display_rel_file (bfd *abfd, bfd *archive_bfd)
+@@ -1484,7 +1487,11 @@ display_rel_file (bfd *abfd, bfd *archive_bfd)
  
    /* lto_type is set to lto_non_ir_object when a bfd is loaded with a
       compiler LTO plugin.  */
 -  if (bfd_get_lto_type (abfd) == lto_slim_ir_object)
-+  if (!bfd_plugin_target_p (abfd->xvec)
-+      && bfd_get_lto_type (abfd) == lto_slim_ir_object)
++  if (bfd_get_lto_type (abfd) == lto_slim_ir_object
++#if BFD_SUPPORTS_PLUGINS
++      && !bfd_plugin_target_p (abfd->xvec)
++#endif
++     )
      {
        report_plugin_err = false;
        non_fatal (_("%s: plugin needed to handle lto object"),
