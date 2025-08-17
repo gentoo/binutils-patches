@@ -1,0 +1,160 @@
+From 6eafbdfab0ff4baecf85e095966f0e7f8b6e2fc8 Mon Sep 17 00:00:00 2001
+Message-ID: <6eafbdfab0ff4baecf85e095966f0e7f8b6e2fc8.1755459855.git.sam@gentoo.org>
+In-Reply-To: <35d2c802f63122702ac48296dac025470c5d1467.1755459855.git.sam@gentoo.org>
+References: <35d2c802f63122702ac48296dac025470c5d1467.1755459855.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Sun, 17 Aug 2025 11:55:18 -0700
+Subject: [PATCH 2/3] x86-64: Add GLIBC_ABI_DT_X86_64_PLT version dependency
+
+On Linux/x86-64, programs and shared libraries created with -z mark-plt
+have the GLIBC_2.36 version tag dependency since -z mark-plt uses the
+r_addend field of the R_X86_64_JUMP_SLOT relocation to store the offset
+of the indirect branch instruction.  Glibc versions which don't have the
+commit added to glibc 2.36:
+
+commit f8587a61892cbafd98ce599131bf4f103466f084
+Author: H.J. Lu <hjl.tools@gmail.com>
+Date:   Fri May 20 19:21:48 2022 -0700
+
+    x86-64: Ignore r_addend for R_X86_64_GLOB_DAT/R_X86_64_JUMP_SLOT
+
+won't ignore the r_addend value in the R_X86_64_JUMP_SLOT relocation.  If
+glibc versions defines GLIBC_ABI_DT_X86_64_PLT version tag with
+
+commit 399384e0c8193e31aea014220ccfa24300ae5938
+Author: H.J. Lu <hjl.tools@gmail.com>
+Date:   Thu Aug 14 07:03:20 2025 -0700
+
+    x86-64: Add GLIBC_ABI_DT_X86_64_PLT [BZ #33212]
+
+to indicate inclusion of the commit:
+
+commit f8587a61892cbafd98ce599131bf4f103466f084
+Author: H.J. Lu <hjl.tools@gmail.com>
+Date:   Fri May 20 19:21:48 2022 -0700
+
+    x86-64: Ignore r_addend for R_X86_64_GLOB_DAT/R_X86_64_JUMP_SLOT
+
+we can add GLIBC_ABI_DT_X86_64_PLT version tag dependency, instead of
+GLIBC_2.36 version tag dependency.
+
+	PR ld/33213
+	* elf-bfd.h (_bfd_elf_link_add_glibc_version_dependency): Change
+	return type to bool.
+	* elf64-x86-64.c (elf_x86_64_add_glibc_version_dependency): Add
+	GLIBC_ABI_DT_X86_64_PLT version tag dependency, instead of,
+	GLIBC_2.36 version tag dependency, for -z mark-plt if libc.so
+	defines GLIBC_ABI_DT_X86_64_PLT version tag.
+	* elflink.c (_bfd_elf_link_add_glibc_version_dependency): Change
+	return type to bool.  Return false if elf_link_add_glibc_verneed
+	returns false.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ bfd/elf-bfd.h                         |  2 +-
+ bfd/elf64-x86-64.c                    | 24 +++++++++++++++++++-----
+ bfd/elflink.c                         |  6 ++++--
+ ld/testsuite/ld-x86-64/mark-plt-1a.rd |  2 +-
+ 4 files changed, 25 insertions(+), 9 deletions(-)
+
+diff --git a/bfd/elf-bfd.h b/bfd/elf-bfd.h
+index feb470fc477..de7cc410a99 100644
+--- a/bfd/elf-bfd.h
++++ b/bfd/elf-bfd.h
+@@ -2631,7 +2631,7 @@ extern bool _bfd_elf_link_output_relocs
+   (bfd *, asection *, Elf_Internal_Shdr *, Elf_Internal_Rela *,
+    struct elf_link_hash_entry **);
+ 
+-extern void _bfd_elf_link_add_glibc_version_dependency
++extern bool _bfd_elf_link_add_glibc_version_dependency
+   (struct elf_find_verdep_info *, const char *const [], bool *);
+ 
+ extern void _bfd_elf_link_add_dt_relr_dependency
+diff --git a/bfd/elf64-x86-64.c b/bfd/elf64-x86-64.c
+index 03873a9ed6b..db3c20679a3 100644
+--- a/bfd/elf64-x86-64.c
++++ b/bfd/elf64-x86-64.c
+@@ -6246,7 +6246,7 @@ static void
+ elf_x86_64_add_glibc_version_dependency
+   (struct elf_find_verdep_info *rinfo)
+ {
+-  unsigned int i = 0;
++  int i = 0, mark_plt = -1;
+   const char *version[4] = { NULL, NULL, NULL, NULL };
+   bool auto_version[4] = { false, false, false, false };
+   struct elf_x86_link_hash_table *htab;
+@@ -6271,14 +6271,28 @@ elf_x86_64_add_glibc_version_dependency
+ 	}
+       if (htab->params->mark_plt)
+ 	{
+-	  version[i] = "GLIBC_2.36";
++	  mark_plt = i;
++	  auto_version[i] = true;
++	  version[i] = "GLIBC_ABI_DT_X86_64_PLT";
+ 	  i++;
+ 	}
+     }
+ 
+-  if (i != 0)
+-    _bfd_elf_link_add_glibc_version_dependency (rinfo, version,
+-						auto_version);
++  if (i == 0
++      || !_bfd_elf_link_add_glibc_version_dependency (rinfo, version,
++						      auto_version))
++    return;
++
++  if (mark_plt < 0 || auto_version[mark_plt])
++    return;
++
++  /* Add the GLIBC_2.36 version dependency if libc.so doesn't have
++     GLIBC_ABI_DT_X86_64_PLT.  */
++  version[0] = "GLIBC_2.36";
++  auto_version[0] = false;
++  version[1] = NULL;
++  _bfd_elf_link_add_glibc_version_dependency (rinfo, version,
++					      auto_version);
+ }
+ 
+ static const struct bfd_elf_special_section
+diff --git a/bfd/elflink.c b/bfd/elflink.c
+index ac40423751f..98759a3dec6 100644
+--- a/bfd/elflink.c
++++ b/bfd/elflink.c
+@@ -2401,7 +2401,7 @@ elf_link_add_glibc_verneed (struct elf_find_verdep_info *rinfo,
+ /* Add VERSION_DEP to the list of version dependencies when linked
+    against glibc.  */
+ 
+-void
++bool
+ _bfd_elf_link_add_glibc_version_dependency
+   (struct elf_find_verdep_info *rinfo,
+    const char *const version_dep[],
+@@ -2414,11 +2414,13 @@ _bfd_elf_link_add_glibc_version_dependency
+       /* Return if not linked against glibc.  */
+       if (!elf_link_add_glibc_verneed (rinfo, *version_dep,
+ 				       &glibc_minor_base, auto_version))
+-	return;
++	return false;
+       version_dep++;
+       auto_version++;
+     }
+   while (*version_dep != NULL);
++
++  return true;
+ }
+ 
+ /* Add GLIBC_ABI_DT_RELR to the list of version dependencies when
+diff --git a/ld/testsuite/ld-x86-64/mark-plt-1a.rd b/ld/testsuite/ld-x86-64/mark-plt-1a.rd
+index 1234fbe038c..b0ed7024420 100644
+--- a/ld/testsuite/ld-x86-64/mark-plt-1a.rd
++++ b/ld/testsuite/ld-x86-64/mark-plt-1a.rd
+@@ -3,5 +3,5 @@ Version needs section '.gnu.version_r' contains 1 entry:
+  Addr: 0x[0-9a-f]+ +Offset: 0x[0-9a-f]+ +Link: +[0-9]+ +\(.dynstr\)
+  +0+: Version: 1 +File: libc\.so\.6(|\.1) +Cnt: +[0-9]+
+ #...
+-  0x[a-f0-9]+:   Name: GLIBC_2.36  Flags: none  Version: [0-9]+
++  0x[a-f0-9]+:   Name: (GLIBC_2.36|GLIBC_ABI_DT_X86_64_PLT)  Flags: none  Version: [0-9]+
+ #pass
+-- 
+2.50.1
+

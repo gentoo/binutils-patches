@@ -1,0 +1,1074 @@
+From 35d2c802f63122702ac48296dac025470c5d1467 Mon Sep 17 00:00:00 2001
+Message-ID: <35d2c802f63122702ac48296dac025470c5d1467.1755459855.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Sun, 17 Aug 2025 11:58:53 -0700
+Subject: [PATCH 1/3] x86-64: Add GLIBC_ABI_GNU2_TLS version dependency
+
+On Linux/x86-64, programs and shared libraries compiled with
+-mtls-dialect=gnu2 may fail silently at run-time against glibc without
+the GNU2 TLS run-time fix for:
+
+https://sourceware.org/bugzilla/show_bug.cgi?id=31372
+
+A version tag, GLIBC_ABI_GNU2_TLS, has been added to glibc to indicate
+that glibc has the working GNU2 TLS run-time by:
+
+commit 9df8fa397d515dc86ff5565f6c45625e672d539e
+Author: H.J. Lu <hjl.tools@gmail.com>
+Date:   Mon Jul 28 12:18:22 2025 -0700
+
+    x86-64: Add GLIBC_ABI_GNU2_TLS version [BZ #33129]
+
+Add the --gnu2-tls-tag option to x86-64 ELF linker to add the
+GLIBC_ABI_GNU2_TLS version dependency in output programs and shared
+libraries when linking against glibc if input relocatable object files
+have R_X86_64_TLSDESC_CALL relocation.  The output will fail to load and
+run at run-time against glibc which doesn't define the GLIBC_ABI_GNU2_TLS
+version.
+
+Add the --enable-gnu2-tls-tag configure option to enable --gnu2-tls-tag
+by default.  If unspecified, linker will add the GLIBC_ABI_GNU2_TLS
+version dependency if inputs have R_X86_64_TLSDESC_CALL relocation and
+libc.so defines the GLIBC_ABI_GNU2_TLS version.
+
+Update elf_link_add_glibc_verneed to properly add the GLIBC_2.36 version
+dependency when -z mark-plt -z nopack-relative-relocs passed to linker.
+
+bfd/
+
+	PR ld/33130
+	* elf-bfd.h (_bfd_elf_link_add_glibc_version_dependency): Add
+	a pointer to bool argument.
+	* elf-linker-x86.h (elf_linker_x86_params): Add gnu2_tls.
+	* elf64-x86-64.c (elf_x86_64_scan_relocs): Set has_tlsdesc_call
+	to 1 for R_X86_64_TLSDESC_CALL.
+	(elf_x86_64_add_glibc_version_dependency): Add GLIBC_ABI_GNU2_TLS
+	version dependency if GLIBC_ABI_GNU2_TLS dependency isn't disabled
+	and has_tlsdesc_call isn't 0.
+	* elflink.c (elf_link_add_glibc_verneed): Changed to return bool.
+	Remove the pointer to elf_find_verdep_info argument.  Add a
+	pointer to bool argument, auto_version. Return true if linked
+	against glibc.  Otherwise return false.  If the version dependency
+	is added, set *auto_version to true.  If *auto_version is true,
+	add the version dependency only if libc.so defines the version.
+	(_bfd_elf_link_add_glibc_version_dependency): Add a pointer to
+	bool argument and pass it to elf_link_add_glibc_verneed.
+	(_bfd_elf_link_add_dt_relr_dependency): Pass NULL to
+	_bfd_elf_link_add_glibc_version_dependency.
+	* elfxx-x86.h (elf_x86_link_hash_table): Add has_tlsdesc_call.
+
+ld/
+
+	PR ld/33130
+	* NEWS: Mention --gnu2-tls-tag, --no-gnu2-tls-tag and
+	--enable-gnu2-tls-tag.
+	* config.in: Regenerated.
+	* configure: Likewise.
+	* configure.ac: Add --enable-gnu2-tls-tag.
+	* ld.texi: Document --gnu2-tls-tag/--no-gnu2-tls-tag.
+	* ldlex.h (option_values): Add OPTION_GNU2_TLS_TAG and
+	OPTION_NO_GNU2_TLS_TAG.
+	* emulparams/elf32_x86_64.sh (EXTRA_EM_FILE): Changed to
+	"elf-x86-64".
+	* emulparams/elf_x86_64.sh (EXTRA_EM_FILE): Likewise.
+	* emultempl/elf-x86-64.em: New file.
+	* emultempl/elf-x86.em (elf_x86_64_before_parse): Removed.
+	(LDEMUL_BEFORE_PARSE): Likewise.
+	(elf_x86_64_before_allocation): Likewise.
+	* testsuite/ld-x86-64/gnu2-tls-1.rd: New file.
+	* testsuite/ld-x86-64/gnu2-tls-1a.od: New file.
+	* testsuite/ld-x86-64/gnu2-tls-1a.s: Likewise.
+	* testsuite/ld-x86-64/gnu2-tls-1b.od: Likewise.
+	* testsuite/ld-x86-64/gnu2-tls-1b.s: Likewise.
+	* testsuite/ld-x86-64/gnu2-tls-1c.od: Likewise.
+	* testsuite/ld-x86-64/gnu2-tls-2.rd: Likewise.
+	* testsuite/ld-x86-64/gnu2-tls-2.s: Likewise.
+	* testsuite/ld-x86-64/mark-plt-2.rd: Likewise.
+	* testsuite/ld-x86-64/mark-plt-2.s: Likewise.
+	* testsuite/ld-x86-64/x86-64.exp: Run GLIBC_ABI_GNU2_TLS tests.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ bfd/elf-bfd.h                         |   2 +-
+ bfd/elf-linker-x86.h                  |   8 ++
+ bfd/elf64-x86-64.c                    |  30 ++++--
+ bfd/elflink.c                         | 130 +++++++++++++++-----------
+ bfd/elfxx-x86.h                       |   4 +
+ ld/NEWS                               |   6 ++
+ ld/config.in                          |   4 +
+ ld/configure                          |  29 +++++-
+ ld/configure.ac                       |  19 ++++
+ ld/emulparams/elf32_x86_64.sh         |   2 +-
+ ld/emulparams/elf_x86_64.sh           |   2 +-
+ ld/emultempl/elf-x86-64.em            | 108 +++++++++++++++++++++
+ ld/emultempl/elf-x86.em               |  58 ------------
+ ld/ld.texi                            |  13 +++
+ ld/ldlex.h                            |   3 +
+ ld/testsuite/ld-x86-64/gnu2-tls-1.rd  |   7 ++
+ ld/testsuite/ld-x86-64/gnu2-tls-1a.od |  13 +++
+ ld/testsuite/ld-x86-64/gnu2-tls-1a.s  |  14 +++
+ ld/testsuite/ld-x86-64/gnu2-tls-1b.od |  13 +++
+ ld/testsuite/ld-x86-64/gnu2-tls-1b.s  |   9 ++
+ ld/testsuite/ld-x86-64/gnu2-tls-1c.od |  13 +++
+ ld/testsuite/ld-x86-64/gnu2-tls-2.rd  |   4 +
+ ld/testsuite/ld-x86-64/gnu2-tls-2.s   |  13 +++
+ ld/testsuite/ld-x86-64/mark-plt-2.rd  |   7 ++
+ ld/testsuite/ld-x86-64/mark-plt-2.s   |  13 +++
+ ld/testsuite/ld-x86-64/x86-64.exp     |  53 ++++++++++-
+ 26 files changed, 454 insertions(+), 123 deletions(-)
+ create mode 100644 ld/emultempl/elf-x86-64.em
+ create mode 100644 ld/testsuite/ld-x86-64/gnu2-tls-1.rd
+ create mode 100644 ld/testsuite/ld-x86-64/gnu2-tls-1a.od
+ create mode 100644 ld/testsuite/ld-x86-64/gnu2-tls-1a.s
+ create mode 100644 ld/testsuite/ld-x86-64/gnu2-tls-1b.od
+ create mode 100644 ld/testsuite/ld-x86-64/gnu2-tls-1b.s
+ create mode 100644 ld/testsuite/ld-x86-64/gnu2-tls-1c.od
+ create mode 100644 ld/testsuite/ld-x86-64/gnu2-tls-2.rd
+ create mode 100644 ld/testsuite/ld-x86-64/gnu2-tls-2.s
+ create mode 100644 ld/testsuite/ld-x86-64/mark-plt-2.rd
+ create mode 100644 ld/testsuite/ld-x86-64/mark-plt-2.s
+
+diff --git a/bfd/elf-bfd.h b/bfd/elf-bfd.h
+index accdd6d41a8..feb470fc477 100644
+--- a/bfd/elf-bfd.h
++++ b/bfd/elf-bfd.h
+@@ -2632,7 +2632,7 @@ extern bool _bfd_elf_link_output_relocs
+    struct elf_link_hash_entry **);
+ 
+ extern void _bfd_elf_link_add_glibc_version_dependency
+-  (struct elf_find_verdep_info *, const char *const []);
++  (struct elf_find_verdep_info *, const char *const [], bool *);
+ 
+ extern void _bfd_elf_link_add_dt_relr_dependency
+   (struct elf_find_verdep_info *);
+diff --git a/bfd/elf-linker-x86.h b/bfd/elf-linker-x86.h
+index 2c98257038f..7656b0a7932 100644
+--- a/bfd/elf-linker-x86.h
++++ b/bfd/elf-linker-x86.h
+@@ -72,6 +72,14 @@ struct elf_linker_x86_params
+   /* Mark PLT with dynamic tags.  */
+   unsigned int mark_plt : 1;
+ 
++  /* Add the GLIBC_ABI_GNU2_TLS version dependency if input object files
++     have R_X86_64_TLSDESC_CALL relocation:
++     0: Disable.
++     1: Enable.
++     2: Auto.  Enable if libc.so has the GLIBC_ABI_GNU2_TLS version.
++   */
++  unsigned int gnu2_tls : 2;
++
+   /* X86-64 ISA level needed.  */
+   unsigned int isa_level;
+ 
+diff --git a/bfd/elf64-x86-64.c b/bfd/elf64-x86-64.c
+index b6f97b5b69b..03873a9ed6b 100644
+--- a/bfd/elf64-x86-64.c
++++ b/bfd/elf64-x86-64.c
+@@ -2694,6 +2694,10 @@ elf_x86_64_scan_relocs (bfd *abfd, struct bfd_link_info *info,
+ 	    eh->zero_undefweak &= 0x2;
+ 	  break;
+ 
++	case R_X86_64_TLSDESC_CALL:
++	  htab->has_tlsdesc_call = 1;
++	  goto need_got;
++
+ 	case R_X86_64_GOTTPOFF:
+ 	case R_X86_64_CODE_4_GOTTPOFF:
+ 	case R_X86_64_CODE_5_GOTTPOFF:
+@@ -2715,7 +2719,7 @@ elf_x86_64_scan_relocs (bfd *abfd, struct bfd_link_info *info,
+ 	case R_X86_64_GOTPLT64:
+ 	case R_X86_64_GOTPC32_TLSDESC:
+ 	case R_X86_64_CODE_4_GOTPC32_TLSDESC:
+-	case R_X86_64_TLSDESC_CALL:
++need_got:
+ 	  /* This symbol requires a global offset table entry.	*/
+ 	  {
+ 	    int tls_type, old_tls_type;
+@@ -6243,7 +6247,8 @@ elf_x86_64_add_glibc_version_dependency
+   (struct elf_find_verdep_info *rinfo)
+ {
+   unsigned int i = 0;
+-  const char *version[3] = { NULL, NULL, NULL };
++  const char *version[4] = { NULL, NULL, NULL, NULL };
++  bool auto_version[4] = { false, false, false, false };
+   struct elf_x86_link_hash_table *htab;
+ 
+   if (rinfo->info->enable_dt_relr)
+@@ -6253,14 +6258,27 @@ elf_x86_64_add_glibc_version_dependency
+     }
+ 
+   htab = elf_x86_hash_table (rinfo->info, X86_64_ELF_DATA);
+-  if (htab != NULL && htab->params->mark_plt)
++  if (htab != NULL)
+     {
+-      version[i] = "GLIBC_2.36";
+-      i++;
++      if (htab->params->gnu2_tls && htab->has_tlsdesc_call)
++	{
++	  version[i] = "GLIBC_ABI_GNU2_TLS";
++	  /* 2 == auto, enable if libc.so defines the GLIBC_ABI_GNU2_TLS
++	     version.  */
++	  if (htab->params->gnu2_tls == 2)
++	    auto_version[i] = true;
++	  i++;
++	}
++      if (htab->params->mark_plt)
++	{
++	  version[i] = "GLIBC_2.36";
++	  i++;
++	}
+     }
+ 
+   if (i != 0)
+-    _bfd_elf_link_add_glibc_version_dependency (rinfo, version);
++    _bfd_elf_link_add_glibc_version_dependency (rinfo, version,
++						auto_version);
+ }
+ 
+ static const struct bfd_elf_special_section
+diff --git a/bfd/elflink.c b/bfd/elflink.c
+index 7b0375406ac..ac40423751f 100644
+--- a/bfd/elflink.c
++++ b/bfd/elflink.c
+@@ -2283,68 +2283,85 @@ _bfd_elf_export_symbol (struct elf_link_hash_entry *h, void *data)
+   return true;
+ }
+ 
+-/* Return the glibc version reference if VERSION_DEP is added to the
+-   list of glibc version dependencies successfully.  VERSION_DEP will
+-   be put into the .gnu.version_r section.  GLIBC_MINOR_BASE is the
+-   pointer to the glibc minor base version.  */
++/* Return true if linked against glibc.  Otherwise return false.  If
++   linked against glibc, add VERSION_DEP to the list of glibc version
++   dependencies and set *AUTO_VERSION to true.  If *AUTO_VERSION is
++   true, add VERSION_DEP to the version dependency list only if libc.so
++   defines VERSION_DEP.  GLIBC_MINOR_BASE is the pointer to the glibc
++   minor base version.  */
+ 
+-static Elf_Internal_Verneed *
++static bool
+ elf_link_add_glibc_verneed (struct elf_find_verdep_info *rinfo,
+-			    Elf_Internal_Verneed *glibc_verref,
+ 			    const char *version_dep,
+-			    int *glibc_minor_base)
++			    int *glibc_minor_base,
++			    bool *auto_version)
+ {
+   Elf_Internal_Verneed *t;
+   Elf_Internal_Vernaux *a;
+   size_t amt;
+   int minor_version = -1;
++  bool added = false;
++  bool glibc = false;
+ 
+-  if (glibc_verref != NULL)
++  for (t = elf_tdata (rinfo->info->output_bfd)->verref;
++       t != NULL;
++       t = t->vn_nextref)
+     {
+-      t = glibc_verref;
++      const char *soname = bfd_elf_get_dt_soname (t->vn_bfd);
++      if (soname != NULL && startswith (soname, "libc.so."))
++	break;
++    }
+ 
+-      for (a = t->vn_auxptr; a != NULL; a = a->vna_nextptr)
++  /* Skip the shared library if it isn't libc.so.  */
++  if (t == NULL)
++    goto update_auto_version_and_return;
++
++  for (a = t->vn_auxptr; a != NULL; a = a->vna_nextptr)
++    {
++      /* Return if VERSION_DEP dependency has been added.  */
++      if (a->vna_nodename == version_dep
++	  || strcmp (a->vna_nodename, version_dep) == 0)
+ 	{
+-	  /* Return if VERSION_DEP dependency has been added.  */
+-	  if (a->vna_nodename == version_dep
+-	      || strcmp (a->vna_nodename, version_dep) == 0)
+-	    return t;
++	  glibc = true;
++	  goto update_auto_version_and_return;
+ 	}
+-    }
+-  else
+-    {
+-      for (t = elf_tdata (rinfo->info->output_bfd)->verref;
+-	   t != NULL;
+-	   t = t->vn_nextref)
++
++      /* Check if libc.so provides GLIBC_2.XX version.  */
++      if (startswith (a->vna_nodename, "GLIBC_2."))
+ 	{
+-	  const char *soname = bfd_elf_get_dt_soname (t->vn_bfd);
+-	  if (soname != NULL && startswith (soname, "libc.so."))
+-	    break;
++	  minor_version = strtol (a->vna_nodename + 8, NULL, 10);
++	  if (minor_version < *glibc_minor_base)
++	    *glibc_minor_base = minor_version;
+ 	}
++    }
+ 
+-      /* Skip the shared library if it isn't libc.so.  */
+-      if (t == NULL)
+-	return t;
++  /* Skip if it isn't linked against glibc.  */
++  if (minor_version < 0)
++    goto update_auto_version_and_return;
+ 
+-      for (a = t->vn_auxptr; a != NULL; a = a->vna_nextptr)
+-	{
+-	  /* Return if VERSION_DEP dependency has been added.  */
+-	  if (a->vna_nodename == version_dep
+-	      || strcmp (a->vna_nodename, version_dep) == 0)
+-	    return t;
++  glibc = true;
+ 
+-	  /* Check if libc.so provides GLIBC_2.XX version.  */
+-	  if (startswith (a->vna_nodename, "GLIBC_2."))
+-	    {
+-	      minor_version = strtol (a->vna_nodename + 8, NULL, 10);
+-	      if (minor_version < *glibc_minor_base)
+-		*glibc_minor_base = minor_version;
+-	    }
+-	}
++  if (auto_version && *auto_version)
++    {
++      /* Add VERSION_DEP to the version dependency list only if
++	 libc.so defines VERSION_DEP.  */
+ 
+-      /* Skip if it isn't linked against glibc.  */
+-      if (minor_version < 0)
+-	return NULL;
++      bool defined = false;
++      Elf_Internal_Verdef *d;
++
++      for (d = elf_tdata (t->vn_bfd)->verdef;
++	   d != NULL;
++	   d = d->vd_nextdef)
++	if (strcmp (d->vd_nodename, version_dep) == 0)
++	  {
++	    defined = true;
++	    break;
++	  }
++
++      /* Set *AUTO_VERSION to false and return true to indicate that
++	 libc.so doesn't define VERSION_DEP.  */
++      if (!defined)
++	goto update_auto_version_and_return;
+     }
+ 
+   /* Skip if 2.GLIBC_MINOR_BASE includes VERSION_DEP.  */
+@@ -2352,7 +2369,7 @@ elf_link_add_glibc_verneed (struct elf_find_verdep_info *rinfo,
+     {
+       minor_version = strtol (version_dep + 8, NULL, 10);
+       if (minor_version <= *glibc_minor_base)
+-	return NULL;
++	goto update_auto_version_and_return;
+     }
+ 
+   amt = sizeof *a;
+@@ -2360,7 +2377,8 @@ elf_link_add_glibc_verneed (struct elf_find_verdep_info *rinfo,
+   if (a == NULL)
+     {
+       rinfo->failed = true;
+-      return NULL;
++      glibc = false;
++      goto update_auto_version_and_return;
+     }
+ 
+   a->vna_nodename = version_dep;
+@@ -2371,7 +2389,13 @@ elf_link_add_glibc_verneed (struct elf_find_verdep_info *rinfo,
+ 
+   t->vn_auxptr = a;
+ 
+-  return t;
++  added = true;
++
++ update_auto_version_and_return:
++  if (auto_version)
++    *auto_version = added;
++
++  return glibc;
+ }
+ 
+ /* Add VERSION_DEP to the list of version dependencies when linked
+@@ -2380,19 +2404,19 @@ elf_link_add_glibc_verneed (struct elf_find_verdep_info *rinfo,
+ void
+ _bfd_elf_link_add_glibc_version_dependency
+   (struct elf_find_verdep_info *rinfo,
+-   const char *const version_dep[])
++   const char *const version_dep[],
++   bool *auto_version)
+ {
+-  Elf_Internal_Verneed *t = NULL;
+   int glibc_minor_base = INT_MAX;
+ 
+   do
+     {
+-      t = elf_link_add_glibc_verneed (rinfo, t, *version_dep,
+-				      &glibc_minor_base);
+-      /* Return if there is no glibc version reference.  */
+-      if (t == NULL)
++      /* Return if not linked against glibc.  */
++      if (!elf_link_add_glibc_verneed (rinfo, *version_dep,
++				       &glibc_minor_base, auto_version))
+ 	return;
+       version_dep++;
++      auto_version++;
+     }
+   while (*version_dep != NULL);
+ }
+@@ -2410,7 +2434,7 @@ _bfd_elf_link_add_dt_relr_dependency (struct elf_find_verdep_info *rinfo)
+ 	  "GLIBC_ABI_DT_RELR",
+ 	  NULL
+ 	};
+-      _bfd_elf_link_add_glibc_version_dependency (rinfo, version);
++      _bfd_elf_link_add_glibc_version_dependency (rinfo, version, NULL);
+     }
+ }
+ 
+diff --git a/bfd/elfxx-x86.h b/bfd/elfxx-x86.h
+index f6ee6a65356..8fd2d81ab6b 100644
+--- a/bfd/elfxx-x86.h
++++ b/bfd/elfxx-x86.h
+@@ -670,6 +670,10 @@ struct elf_x86_link_hash_table
+   /* Number of relative reloc generation pass.  */
+   unsigned int generate_relative_reloc_pass;
+ 
++  /* TRUE if inputs have R_X86_64_TLSDESC_CALL relocation.  This is
++     only used for x86-64.  */
++  unsigned int has_tlsdesc_call : 1;
++
+    /* Value used to fill the unused bytes of the first PLT entry.  This
+       is only used for i386.  */
+   bfd_byte plt0_pad_byte;
+diff --git a/ld/NEWS b/ld/NEWS
+index 54c1df5aadf..cfb5c9c81df 100644
+--- a/ld/NEWS
++++ b/ld/NEWS
+@@ -1,5 +1,11 @@
+ -*- text -*-
+ 
++* Add --gnu2-tls-tag/--no-gnu2-tls-tag options to x86-64 ELF linker to
++  add the GLIBC_ABI_GNU2_TLS version dependency in output if input object
++  files have R_X86_64_TLSDESC_CALL relocation.  Also added
++  --enable-gnu2-tls-tag configure option to enable --gnu2-tls-tag by
++  default.
++
+ * NaCl target support is removed.
+ 
+ Changes in 2.45:
+diff --git a/ld/config.in b/ld/config.in
+index 37812241bd9..021577dbe4d 100644
+--- a/ld/config.in
++++ b/ld/config.in
+@@ -31,6 +31,10 @@
+    when a .note-GNU-stack section is missing. */
+ #undef DEFAULT_LD_EXECSTACK
+ 
++/* Define to 1 if you want to enable --gnu2-tls-tag in ELF x86-64 linker by
++   default. */
++#undef DEFAULT_LD_GNU2_TLS_TAG
++
+ /* Define to 1 if you want to enable --rosegment in the ELF linker by default.
+    */
+ #undef DEFAULT_LD_ROSEGMENT
+diff --git a/ld/configure b/ld/configure
+index 124b44182bc..9c694525488 100755
+--- a/ld/configure
++++ b/ld/configure
+@@ -851,6 +851,7 @@ enable_textrel_check
+ enable_separate_code
+ enable_rosegment
+ enable_mark_plt
++enable_gnu2_tls_tag
+ enable_memory_seal
+ enable_warn_execstack
+ enable_error_execstack
+@@ -1548,6 +1549,8 @@ Optional Features:
+   --enable-separate-code  enable -z separate-code in ELF linker by default
+   --enable-rosegment      enable --rosegment in the ELF linker by default
+   --enable-mark-plt       enable -z mark-plt in ELF x86-64 linker by default
++  --enable-gnu2-tls-tag   enable --gnu2-tls-tag in ELF x86-64 linker by
++                          default
+   --enable-memory-seal    enable -z memory-seal in ELF linker by default
+   --enable-warn-execstack enable warnings when creating an executable stack
+   --enable-error-execstack
+@@ -11514,7 +11517,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11517 "configure"
++#line 11520 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -11620,7 +11623,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11623 "configure"
++#line 11626 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -15507,6 +15510,18 @@ esac
+ fi
+ 
+ 
++# Decide if --gnu2-tls-tag should be enabled in ELF x86-64 linker
++# by default.
++ac_default_ld_enable_gnu2_tls_tag=unset
++# Check whether --enable-gnu2-tls-tag was given.
++if test "${enable_gnu2_tls_tag+set}" = set; then :
++  enableval=$enable_gnu2_tls_tag; case "${enableval}" in
++  yes) ac_default_ld_enable_gnu2_tls_tag=1 ;;
++  no) ac_default_ld_enable_gnu2_tls_tag=0 ;;
++esac
++fi
++
++
+ # Decide if -z memory-seal should be enabled in ELF linker by default.
+ ac_default_ld_z_memory_seal=unset
+ # Check whether --enable-memory-seal was given.
+@@ -18981,6 +18996,16 @@ cat >>confdefs.h <<_ACEOF
+ _ACEOF
+ 
+ 
++if test "${ac_default_ld_enable_gnu2_tls_tag}" = unset; then
++  # Default to enable --gnu2-tls-tag if libc.so has the GLIBC_ABI_GNU2_TLS
++  # version.
++  ac_default_ld_enable_gnu2_tls_tag=2
++fi
++
++cat >>confdefs.h <<_ACEOF
++#define DEFAULT_LD_GNU2_TLS_TAG $ac_default_ld_enable_gnu2_tls_tag
++_ACEOF
++
+ 
+ 
+ cat >>confdefs.h <<_ACEOF
+diff --git a/ld/configure.ac b/ld/configure.ac
+index e306c1ded4a..d4801fb1333 100644
+--- a/ld/configure.ac
++++ b/ld/configure.ac
+@@ -245,6 +245,17 @@ AC_ARG_ENABLE(mark-plt,
+   no) ac_default_ld_z_mark_plt=0 ;;
+ esac])
+ 
++# Decide if --gnu2-tls-tag should be enabled in ELF x86-64 linker
++# by default.
++ac_default_ld_enable_gnu2_tls_tag=unset
++AC_ARG_ENABLE(gnu2-tls-tag,
++	      AS_HELP_STRING([--enable-gnu2-tls-tag],
++	      [enable --gnu2-tls-tag in ELF x86-64 linker by default]),
++[case "${enableval}" in
++  yes) ac_default_ld_enable_gnu2_tls_tag=1 ;;
++  no) ac_default_ld_enable_gnu2_tls_tag=0 ;;
++esac])
++
+ # Decide if -z memory-seal should be enabled in ELF linker by default.
+ ac_default_ld_z_memory_seal=unset
+ AC_ARG_ENABLE(memory-seal,
+@@ -646,6 +657,14 @@ AC_DEFINE_UNQUOTED(DEFAULT_LD_Z_MEMORY_SEAL,
+   $ac_default_ld_z_memory_seal,
+   [Define to 1 if you want to enable -z memory_seal in ELF linker by default.])
+ 
++if test "${ac_default_ld_enable_gnu2_tls_tag}" = unset; then
++  # Default to enable --gnu2-tls-tag if libc.so has the GLIBC_ABI_GNU2_TLS
++  # version.
++  ac_default_ld_enable_gnu2_tls_tag=2
++fi
++AC_DEFINE_UNQUOTED(DEFAULT_LD_GNU2_TLS_TAG,
++  $ac_default_ld_enable_gnu2_tls_tag,
++  [Define to 1 if you want to enable --gnu2-tls-tag in ELF x86-64 linker by default.])
+ 
+ AC_DEFINE_UNQUOTED(DEFAULT_LD_WARN_EXECSTACK,
+   $ac_default_ld_warn_execstack,
+diff --git a/ld/emulparams/elf32_x86_64.sh b/ld/emulparams/elf32_x86_64.sh
+index 6a92eec129d..4807413d133 100644
+--- a/ld/emulparams/elf32_x86_64.sh
++++ b/ld/emulparams/elf32_x86_64.sh
+@@ -20,7 +20,7 @@ COMMONPAGESIZE="CONSTANT (COMMONPAGESIZE)"
+ ARCH="i386:x64-32"
+ MACHINE=
+ TEMPLATE_NAME=elf
+-EXTRA_EM_FILE="elf-x86"
++EXTRA_EM_FILE="elf-x86-64"
+ GENERATE_SHLIB_SCRIPT=yes
+ GENERATE_PIE_SCRIPT=yes
+ NO_SMALL_DATA=yes
+diff --git a/ld/emulparams/elf_x86_64.sh b/ld/emulparams/elf_x86_64.sh
+index 92449745c7a..39cbf2ca189 100644
+--- a/ld/emulparams/elf_x86_64.sh
++++ b/ld/emulparams/elf_x86_64.sh
+@@ -21,7 +21,7 @@ COMMONPAGESIZE="CONSTANT (COMMONPAGESIZE)"
+ ARCH="i386:x86-64"
+ MACHINE=
+ TEMPLATE_NAME=elf
+-EXTRA_EM_FILE="elf-x86"
++EXTRA_EM_FILE="elf-x86-64"
+ GENERATE_SHLIB_SCRIPT=yes
+ GENERATE_PIE_SCRIPT=yes
+ NO_SMALL_DATA=yes
+diff --git a/ld/emultempl/elf-x86-64.em b/ld/emultempl/elf-x86-64.em
+new file mode 100644
+index 00000000000..6bb7844741c
+--- /dev/null
++++ b/ld/emultempl/elf-x86-64.em
+@@ -0,0 +1,108 @@
++# This shell script emits a C file. -*- C -*-
++#   Copyright (C) 2025 Free Software Foundation, Inc.
++#
++# This file is part of the GNU Binutils.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the license, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; see the file COPYING3. If not,
++# see <http://www.gnu.org/licenses/>.
++#
++
++# This file is sourced from elf.em, and defines x86-64 specific routines.
++#
++
++source_em ${srcdir}/emultempl/elf-x86.em
++
++fragment <<EOF
++static void
++elf_x86_64_before_parse (void)
++{
++  params.mark_plt = DEFAULT_LD_Z_MARK_PLT;
++  params.gnu2_tls = DEFAULT_LD_GNU2_TLS_TAG;
++
++  elf_x86_before_parse ();
++}
++
++static void
++elf_x86_64_before_allocation (void)
++{
++  if (!bfd_link_relocatable (&link_info)
++      && is_elf_hash_table (link_info.hash)
++      && expld.phase != lang_mark_phase_enum)
++    {
++      struct elf_link_hash_table *htab = elf_hash_table (&link_info);
++      /* Run one_lang_size_sections_pass to estimate the output section
++	 layout before sizing dynamic sections.  */
++      expld.dataseg.phase = exp_seg_none;
++      expld.phase = lang_mark_phase_enum;
++      /* NB: Exclude linker created GOT setions when estimating output
++	 section layout as sizing dynamic sections may change linker
++	 created GOT sections.  */
++      if (htab->sgot != NULL)
++	htab->sgot->flags |= SEC_EXCLUDE;
++      if (htab->sgotplt != NULL)
++	htab->sgotplt->flags |= SEC_EXCLUDE;
++      one_lang_size_sections_pass (NULL, false);
++      /* Restore linker created GOT setions.  */
++      if (htab->sgot != NULL)
++	htab->sgot->flags &= ~SEC_EXCLUDE;
++      if (htab->sgotplt != NULL)
++	htab->sgotplt->flags &= ~SEC_EXCLUDE;
++      lang_reset_memory_regions ();
++    }
++
++  gld${EMULATION_NAME}_before_allocation ();
++}
++EOF
++
++LDEMUL_BEFORE_PARSE=elf_x86_64_before_parse
++LDEMUL_BEFORE_ALLOCATION=elf_x86_64_before_allocation
++
++# Define some shell vars to insert bits of code into the standard elf
++# parse_args and list_options functions.
++#
++
++PARSE_AND_LIST_LONGOPTS_X86_64='
++  { "gnu2-tls-tag", no_argument, NULL, OPTION_GNU2_TLS_TAG },
++  { "no-gnu2-tls-tag", no_argument, NULL, OPTION_NO_GNU2_TLS_TAG },
++'
++
++PARSE_AND_LIST_OPTIONS_X86_64='
++  if (DEFAULT_LD_GNU2_TLS_TAG == 0)
++    fprintf (file, _("\
++  --gnu2-tls-tag              Add GLIBC_ABI_GNU2_TLS dependency\n\
++  --no-gnu2-tls-tag           Do not add GLIBC_ABI_GNU2_TLS dependency (default)\n"));
++  else if (DEFAULT_LD_GNU2_TLS_TAG == 1)
++    fprintf (file, _("\
++  --gnu2-tls-tag              Add GLIBC_ABI_GNU2_TLS dependency (default)\n\
++  --no-gnu2-tls-tag           Do not add GLIBC_ABI_GNU2_TLS dependency\n"));
++  else
++    fprintf (file, _("\
++  --gnu2-tls-tag              Add GLIBC_ABI_GNU2_TLS dependency (auto)\n\
++                                when no options are specified (default)\n\
++  --no-gnu2-tls-tag           Do not add GLIBC_ABI_GNU2_TLS dependency\n"));
++'
++
++PARSE_AND_LIST_ARGS_CASES_X86_64='
++    case OPTION_GNU2_TLS_TAG:
++      params.gnu2_tls = 1;
++      break;
++
++    case OPTION_NO_GNU2_TLS_TAG:
++      params.gnu2_tls = 0;
++      break;
++'
++
++PARSE_AND_LIST_LONGOPTS="$PARSE_AND_LIST_LONGOPTS $PARSE_AND_LIST_LONGOPTS_X86_64"
++PARSE_AND_LIST_OPTIONS="$PARSE_AND_LIST_OPTIONS $PARSE_AND_LIST_OPTIONS_X86_64"
++PARSE_AND_LIST_ARGS_CASES="$PARSE_AND_LIST_ARGS_CASES $PARSE_AND_LIST_ARGS_CASES_X86_64"
+diff --git a/ld/emultempl/elf-x86.em b/ld/emultempl/elf-x86.em
+index f72a0cd0d4a..411a4d62294 100644
+--- a/ld/emultempl/elf-x86.em
++++ b/ld/emultempl/elf-x86.em
+@@ -56,61 +56,3 @@ EOF
+ 
+ LDEMUL_BEFORE_PARSE=elf_x86_before_parse
+ fi
+-
+-case x${OUTPUT_FORMAT}${CALL_NOP_BYTE} in
+-  x*x86-64*0x67)
+-fragment <<EOF
+-
+-static void
+-elf_x86_64_before_parse (void)
+-{
+-  params.mark_plt = DEFAULT_LD_Z_MARK_PLT;
+-
+-  elf_x86_before_parse ();
+-}
+-EOF
+-
+-    LDEMUL_BEFORE_PARSE=elf_x86_64_before_parse
+-    ;;
+-esac
+-
+-case x${OUTPUT_FORMAT} in
+-  x*x86-64*)
+-fragment <<EOF
+-
+-static void
+-elf_x86_64_before_allocation (void)
+-{
+-  if (!bfd_link_relocatable (&link_info)
+-      && is_elf_hash_table (link_info.hash)
+-      && expld.phase != lang_mark_phase_enum)
+-    {
+-      struct elf_link_hash_table *htab = elf_hash_table (&link_info);
+-      /* Run one_lang_size_sections_pass to estimate the output section
+-	 layout before sizing dynamic sections.  */
+-      expld.dataseg.phase = exp_seg_none;
+-      expld.phase = lang_mark_phase_enum;
+-      /* NB: Exclude linker created GOT setions when estimating output
+-	 section layout as sizing dynamic sections may change linker
+-	 created GOT sections.  */
+-      if (htab->sgot != NULL)
+-	htab->sgot->flags |= SEC_EXCLUDE;
+-      if (htab->sgotplt != NULL)
+-	htab->sgotplt->flags |= SEC_EXCLUDE;
+-      one_lang_size_sections_pass (NULL, false);
+-      /* Restore linker created GOT setions.  */
+-      if (htab->sgot != NULL)
+-	htab->sgot->flags &= ~SEC_EXCLUDE;
+-      if (htab->sgotplt != NULL)
+-	htab->sgotplt->flags &= ~SEC_EXCLUDE;
+-      lang_reset_memory_regions ();
+-    }
+-
+-  gld${EMULATION_NAME}_before_allocation ();
+-}
+-
+-EOF
+-
+-LDEMUL_BEFORE_ALLOCATION=elf_x86_64_before_allocation
+-    ;;
+-esac
+diff --git a/ld/ld.texi b/ld/ld.texi
+index 413335ad765..7afff6e8ac7 100644
+--- a/ld/ld.texi
++++ b/ld/ld.texi
+@@ -1743,6 +1743,19 @@ Supported for Linux/i386 and Linux/x86_64.
+ 
+ @end table
+ 
++@item --gnu2-tls-tag
++@itemx --no-gnu2-tls-tag
++Add @code{GLIBC_ABI_GNU2_TLS} version tag dependency in output programs
++and shared libraries when linking against glibc if input relocatable
++object files have @code{R_X86_64_TLSDESC_CALL} relocation.  The output
++will fail to load and run at run-time against glibc which doesn't define
++the @code{GLIBC_ABI_GNU2_TLS} version tag.  Unless disabled by the
++@option{--disable-gnu2-tls-tag} configure option at the linker build
++time, when no options are specified, linker will add the
++@code{GLIBC_ABI_GNU2_TLS} version tag dependency if inputs have
++@code{R_X86_64_TLSDESC_CALL} relocation and libc.so defines the
++@code{GLIBC_ABI_GNU2_TLS} version tag.  Supported for Linux/x86_64.
++
+ Other keywords are ignored for Solaris compatibility.
+ 
+ @kindex -(
+diff --git a/ld/ldlex.h b/ld/ldlex.h
+index 815da76a4c0..58bbd5771da 100644
+--- a/ld/ldlex.h
++++ b/ld/ldlex.h
+@@ -471,6 +471,9 @@ enum option_values
+   OPTION_NO_LITERAL_MOVEMENT,
+   OPTION_ABI_WINDOWED,
+   OPTION_ABI_CALL0,
++  /* Used by emultempl/elf-x86-64.em.  */
++  OPTION_GNU2_TLS_TAG,
++  OPTION_NO_GNU2_TLS_TAG,
+ };
+ 
+ /* The initial parser states.  */
+diff --git a/ld/testsuite/ld-x86-64/gnu2-tls-1.rd b/ld/testsuite/ld-x86-64/gnu2-tls-1.rd
+new file mode 100644
+index 00000000000..3eb926a227c
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/gnu2-tls-1.rd
+@@ -0,0 +1,7 @@
++#...
++Version needs section '.gnu.version_r' contains 1 entry:
++ Addr: 0x[0-9a-f]+ +Offset: 0x[0-9a-f]+ +Link: +[0-9]+ +\(.dynstr\)
++ +0+: Version: 1 +File: libc\.so\.6(|\.1) +Cnt: +[0-9]+
++#...
++  0x[a-f0-9]+:   Name: GLIBC_ABI_GNU2_TLS  Flags: none  Version: [0-9]+
++#pass
+diff --git a/ld/testsuite/ld-x86-64/gnu2-tls-1a.od b/ld/testsuite/ld-x86-64/gnu2-tls-1a.od
+new file mode 100644
+index 00000000000..e237b26898d
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/gnu2-tls-1a.od
+@@ -0,0 +1,13 @@
++
++.*: +file format .*
++#...
++[a-f0-9]+ <main>:
++ +[a-f0-9]+:	48 83 ec 08          	sub    \$0x8,%rsp
++ +[a-f0-9]+:	48 8d 05 ([0-9a-f]{2} ){4}	lea    0x[a-f0-9]+\(%rip\),%rax        # [a-f0-9]+ <foo@@Base\+0x[a-f0-9]+>
++ +[a-f0-9]+:	66 2e 0f 1f 84 00 00 00 00 00 	cs nopw 0x0\(%rax,%rax,1\)
++ +[a-f0-9]+:	ff 10                	call   \*\(%rax\)
++ +[a-f0-9]+:	64 8b 00             	mov    %fs:\(%rax\),%eax
++ +[a-f0-9]+:	48 83 c4 08          	add    \$0x8,%rsp
++ +[a-f0-9]+:	c3                   	ret
++ +[a-f0-9]+:	90                   	nop
++#pass
+diff --git a/ld/testsuite/ld-x86-64/gnu2-tls-1a.s b/ld/testsuite/ld-x86-64/gnu2-tls-1a.s
+new file mode 100644
+index 00000000000..b8c004538ff
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/gnu2-tls-1a.s
+@@ -0,0 +1,14 @@
++	.section	.text.startup,"ax",@progbits
++	.p2align 4
++	.globl	main
++	.type	main, @function
++main:
++	subq	$8, %rsp
++	leaq	foo@TLSDESC(%rip), %rax
++	.nops 10
++	call	*foo@TLSCALL(%rax)
++	movl	%fs:(%rax), %eax
++	addq	$8, %rsp
++	ret
++	.size	main, .-main
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/ld/testsuite/ld-x86-64/gnu2-tls-1b.od b/ld/testsuite/ld-x86-64/gnu2-tls-1b.od
+new file mode 100644
+index 00000000000..8bd685006bd
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/gnu2-tls-1b.od
+@@ -0,0 +1,13 @@
++
++.*: +file format .*
++#...
++[a-f0-9]+ <main>:
++ +[a-f0-9]+:	48 83 ec 08          	sub    \$0x8,%rsp
++ +[a-f0-9]+:	48 c7 c0 fc ff ff ff 	mov    \$0xfffffffffffffffc,%rax
++ +[a-f0-9]+:	66 2e 0f 1f 84 00 00 00 00 00 	cs nopw 0x0\(%rax,%rax,1\)
++ +[a-f0-9]+:	66 90                	xchg   %ax,%ax
++ +[a-f0-9]+:	64 8b 00             	mov    %fs:\(%rax\),%eax
++ +[a-f0-9]+:	48 83 c4 08          	add    \$0x8,%rsp
++ +[a-f0-9]+:	c3                   	ret
++ +[a-f0-9]+:	90                   	nop
++#pass
+diff --git a/ld/testsuite/ld-x86-64/gnu2-tls-1b.s b/ld/testsuite/ld-x86-64/gnu2-tls-1b.s
+new file mode 100644
+index 00000000000..fcc355f7e5c
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/gnu2-tls-1b.s
+@@ -0,0 +1,9 @@
++	.text
++	.globl	foo
++	.section	.tbss,"awT",@nobits
++	.align 4
++	.type	foo, @object
++	.size	foo, 4
++foo:
++	.zero	4
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/ld/testsuite/ld-x86-64/gnu2-tls-1c.od b/ld/testsuite/ld-x86-64/gnu2-tls-1c.od
+new file mode 100644
+index 00000000000..8bd685006bd
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/gnu2-tls-1c.od
+@@ -0,0 +1,13 @@
++
++.*: +file format .*
++#...
++[a-f0-9]+ <main>:
++ +[a-f0-9]+:	48 83 ec 08          	sub    \$0x8,%rsp
++ +[a-f0-9]+:	48 c7 c0 fc ff ff ff 	mov    \$0xfffffffffffffffc,%rax
++ +[a-f0-9]+:	66 2e 0f 1f 84 00 00 00 00 00 	cs nopw 0x0\(%rax,%rax,1\)
++ +[a-f0-9]+:	66 90                	xchg   %ax,%ax
++ +[a-f0-9]+:	64 8b 00             	mov    %fs:\(%rax\),%eax
++ +[a-f0-9]+:	48 83 c4 08          	add    \$0x8,%rsp
++ +[a-f0-9]+:	c3                   	ret
++ +[a-f0-9]+:	90                   	nop
++#pass
+diff --git a/ld/testsuite/ld-x86-64/gnu2-tls-2.rd b/ld/testsuite/ld-x86-64/gnu2-tls-2.rd
+new file mode 100644
+index 00000000000..33ef8acb232
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/gnu2-tls-2.rd
+@@ -0,0 +1,4 @@
++#failif
++#...
++  0x[a-f0-9]+:   Name: GLIBC_ABI_GNU2_TLS  Flags: none  Version: [0-9]+
++#...
+diff --git a/ld/testsuite/ld-x86-64/gnu2-tls-2.s b/ld/testsuite/ld-x86-64/gnu2-tls-2.s
+new file mode 100644
+index 00000000000..d957eb71f6d
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/gnu2-tls-2.s
+@@ -0,0 +1,13 @@
++	.text
++	.p2align 4
++	.globl	func
++	.type	func, @function
++func:
++	leaq	foo@tlsld(%rip), %rdi
++	call	__tls_get_addr@PLT
++	data16	leaq	foo@tlsgd(%rip), %rdi
++	.value	0x6666
++	rex64
++	call	__tls_get_addr@PLT
++	.size	func, .-func
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/ld/testsuite/ld-x86-64/mark-plt-2.rd b/ld/testsuite/ld-x86-64/mark-plt-2.rd
+new file mode 100644
+index 00000000000..b0ed7024420
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/mark-plt-2.rd
+@@ -0,0 +1,7 @@
++#...
++Version needs section '.gnu.version_r' contains 1 entry:
++ Addr: 0x[0-9a-f]+ +Offset: 0x[0-9a-f]+ +Link: +[0-9]+ +\(.dynstr\)
++ +0+: Version: 1 +File: libc\.so\.6(|\.1) +Cnt: +[0-9]+
++#...
++  0x[a-f0-9]+:   Name: (GLIBC_2.36|GLIBC_ABI_DT_X86_64_PLT)  Flags: none  Version: [0-9]+
++#pass
+diff --git a/ld/testsuite/ld-x86-64/mark-plt-2.s b/ld/testsuite/ld-x86-64/mark-plt-2.s
+new file mode 100644
+index 00000000000..c816567c204
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/mark-plt-2.s
+@@ -0,0 +1,13 @@
++	.text
++	.globl	foo
++	.type	foo, @function
++foo:
++	subq	$8, %rsp
++	leaq	xxx@TLSDESC(%rip), %rax
++	.nops 10
++	call	*xxx@TLSCALL(%rax)
++	movl	%fs:(%rax), %eax
++	addq	$8, %rsp
++	call	bar
++	ret
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/ld/testsuite/ld-x86-64/x86-64.exp b/ld/testsuite/ld-x86-64/x86-64.exp
+index 6b86bc3d018..2ee12a2ef55 100644
+--- a/ld/testsuite/ld-x86-64/x86-64.exp
++++ b/ld/testsuite/ld-x86-64/x86-64.exp
+@@ -2358,7 +2358,7 @@ run_dump_test "ibt-plt-3b-x32"
+ run_dump_test "ibt-plt-3c-x32"
+ run_dump_test "ibt-plt-3d-x32"
+ 
+-# Skip -z mark-plt tests on MUSL.
++# Skip -z mark-plt and --gnu2-tls-tag tests on MUSL.
+ if { [istarget "x86_64-*-musl*"]} {
+     set ASFLAGS "$saved_ASFLAGS"
+     return
+@@ -2384,6 +2384,57 @@ if { [check_compiler_available] } {
+ 	     {readelf {-W --version-info} mark-plt-1b.rd}} \
+ 	    "mark-plt-1.so" \
+ 	] \
++	[list \
++	    "Build mark-plt-2.so" \
++	    "-shared -Wl,--no-as-needed,-z,mark-plt,-z,nopack-relative-relocs" \
++	    "-fPIC" \
++	    { mark-plt-2.s } \
++	    {{readelf {-W --version-info} mark-plt-2.rd}} \
++	    "mark-plt-2.so" \
++	] \
++	[list \
++	    "Build gnu2-tls-1.so" \
++	    "-shared -Wl,--no-as-needed,--gnu2-tls-tag" \
++	    "-fPIC" \
++	    { gnu2-tls-1a.s gnu2-tls-1b.s } \
++	    {{objdump {-dw} gnu2-tls-1a.od}
++	     {readelf {-W --version-info} gnu2-tls-1.rd}} \
++	    "gnu2-tls-1.so" \
++	] \
++	[list \
++	    "Build gnu2-tls-1-no-gnu2-tls.so" \
++	    "-shared -Wl,--no-as-needed,--gnu2-tls-tag" \
++	    "-fPIC" \
++	    { gnu2-tls-1.s } \
++	    {{readelf {-W --version-info} gnu2-tls-2.rd}} \
++	    "gnu2-tls-1-no-gnu2-tls.so" \
++	] \
++	[list \
++	    "Build gnu2-tls-1 (PDE)" \
++	    "$NOPIE_LDFLAGS -Wl,--no-as-needed,--gnu2-tls-tag" \
++	    "-fPIC" \
++	    { gnu2-tls-1a.s gnu2-tls-1b.s } \
++	    {{objdump {-dw} gnu2-tls-1b.od}
++	     {readelf {-W --version-info} gnu2-tls-2.rd}} \
++	    "gnu2-tls-1.pde" \
++	] \
++	[list \
++	    "Build gnu2-tls-1 (PIE)" \
++	    "-pie -Wl,--no-as-needed,--gnu2-tls-tag" \
++	    "-fPIC" \
++	    { gnu2-tls-1a.s gnu2-tls-1b.s } \
++	    {{objdump {-dw} gnu2-tls-1c.od}
++	     {readelf {-W --version-info} gnu2-tls-2.rd}} \
++	    "gnu2-tls-1.pie" \
++	] \
++	[list \
++	    "Build gnu2-tls-2.so" \
++	    "-shared -Wl,--no-as-needed,--gnu2-tls-tag" \
++	    "-fPIC" \
++	    { gnu2-tls-2.s } \
++	    {{readelf {-W --version-info} gnu2-tls-2.rd}} \
++	    "gnu2-tls-2.s.so" \
++	] \
+     ]
+ }
+ 
+
+base-commit: a5858e81363051a818ea163d52f62d8251097d11
+-- 
+2.50.1
+

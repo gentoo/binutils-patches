@@ -1,0 +1,393 @@
+From d4cbc75a7fb72c0fadf86fea73d86540fdc88166 Mon Sep 17 00:00:00 2001
+Message-ID: <d4cbc75a7fb72c0fadf86fea73d86540fdc88166.1755459855.git.sam@gentoo.org>
+In-Reply-To: <35d2c802f63122702ac48296dac025470c5d1467.1755459855.git.sam@gentoo.org>
+References: <35d2c802f63122702ac48296dac025470c5d1467.1755459855.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Sat, 16 Aug 2025 14:49:05 -0700
+Subject: [PATCH 3/3] ld: Properly override compiler flags in tests
+
+Some tests need to be compiled with additional flags.  When binutils is
+built and compiled with
+
+CC="gcc -fsanitize=address,undefined" CXX="g++ -fsanitize=address,undefined"
+
+some linker tests fail to disable address sanitizer options since
+proc default_ld_compile has
+
+    set ccexe $cc
+    set ccparm [string first " " $cc]
+    set ccflags ""
+    if { $ccparm > 0 } then {
+        set ccflags [string range $cc $ccparm end]
+        set ccexe [string range $cc 0 $ccparm]
+        set cc $ccexe
+    }
+...
+    set cmd "$cc $flags $ccflags -c $source -o $object"
+
+Compiler flags in $CC and $CXX will be the last ones.  Add
+CFLAGS_FOR_TARGET_TEST and CXXFLAGS_FOR_TARGET_TEST to use them in
+proc default_ld_compile
+
+    set cflag_test ""
+    set cxxflag_test ""
+    if {[string match "*++*" $ccexe]} {
+        append flags " $CXXFLAGS_FOR_TARGET"
+        set cflag_test "$CXXFLAGS_FOR_TARGET_TEST"
+    } else {
+        append flags " $CFLAGS_FOR_TARGET"
+        set cflag_test "$CFLAGS_FOR_TARGET_TEST"
+    }
+...
+    set cmd "$cc $flags $ccflags $cflag_test -c $source -o $object"
+
+so that they will be the last flags passed to compiler.  Also update
+run_ld_link_exec_tests and run_cc_link_tests to make
+CFLAGS_FOR_TARGET_TEST and CXXFLAGS_FOR_TARGET_TEST the last flags
+passed to compiler.
+
+	* testsuite/config/default.exp (CFLAGS_FOR_TARGET_TEST): New.
+	(CXXFLAGS_FOR_TARGET_TEST): Likewise.
+	* testsuite/ld-elf/dwarf.exp (CFLAGS_FOR_TARGET): Renamed to ...
+	(CFLAGS_FOR_TARGET_TEST): This.
+	* testsuite/ld-elf/shared.exp: Save, append and restore
+	CFLAGS_FOR_TARGET_TEST and CXXFLAGS_FOR_TARGET_TEST for
+	$build_tests.  Save, append and restore CFLAGS_FOR_TARGET_TEST,
+	instead of CFLAGS_FOR_TARGET, for $dlopen_run_tests.
+	* testsuite/ld-plugin/plugin.exp (CFLAGS_FOR_TARGET): Renamed to
+	...
+	(CFLAGS_FOR_TARGET_TEST): This.
+	* testsuite/ld-shared/shared.exp (CFLAGS_FOR_TARGET): Renamed to
+	...
+	(CFLAGS_FOR_TARGET_TEST): This.
+	* testsuite/ld-srec/srec.exp (CFLAGS_FOR_TARGET): Renamed to ...
+	(CFLAGS_FOR_TARGET_TEST): This.
+	(CXXFLAGS_FOR_TARGET): Renamed to ...
+	(CXXFLAGS_FOR_TARGET_TEST): This.
+	* testsuite/lib/ld-lib.exp (default_ld_compile): Append
+	CFLAGS_FOR_TARGET_TEST/CXXFLAGS_FOR_TARGET_TEST to compiler flags.
+	(run_ld_link_exec_tests): Append CFLAGS_FOR_TARGET_TEST and
+	CXXFLAGS_FOR_TARGET_TEST to compiler.
+	(run_cc_link_tests): Likewise.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ ld/testsuite/config/default.exp   |  6 ++++++
+ ld/testsuite/ld-elf/dwarf.exp     |  6 +++---
+ ld/testsuite/ld-elf/shared.exp    | 12 +++++++++---
+ ld/testsuite/ld-plugin/plugin.exp | 10 +++++-----
+ ld/testsuite/ld-shared/shared.exp |  8 ++++----
+ ld/testsuite/ld-srec/srec.exp     | 28 ++++++++++++++--------------
+ ld/testsuite/lib/ld-lib.exp       | 28 +++++++++++++++++++---------
+ 7 files changed, 60 insertions(+), 38 deletions(-)
+
+diff --git a/ld/testsuite/config/default.exp b/ld/testsuite/config/default.exp
+index 1c12ce60193..9f286831e07 100644
+--- a/ld/testsuite/config/default.exp
++++ b/ld/testsuite/config/default.exp
+@@ -117,12 +117,18 @@ if {![info exists CC_FOR_TARGET]} {
+ if {![info exists CFLAGS_FOR_TARGET]} {
+     set CFLAGS_FOR_TARGET "-g -O2"
+ }
++if {![info exists CFLAGS_FOR_TARGET_TEST]} {
++    set CFLAGS_FOR_TARGET_TEST ""
++}
+ if {![info exists CXX_FOR_TARGET]} {
+     set CXX_FOR_TARGET [find_g++]
+ }
+ if {![info exists CXXFLAGS_FOR_TARGET]} {
+     set CXXFLAGS_FOR_TARGET ""
+ }
++if {![info exists CXXFLAGS_FOR_TARGET_TEST]} {
++    set CXXFLAGS_FOR_TARGET_TEST ""
++}
+ 
+ # This allows us to run the linker testsuite with clang as the compilation
+ # driver instead of gcc.  The syntax of the overrides are as follows, one
+diff --git a/ld/testsuite/ld-elf/dwarf.exp b/ld/testsuite/ld-elf/dwarf.exp
+index c7b2915a963..4f7963526e9 100644
+--- a/ld/testsuite/ld-elf/dwarf.exp
++++ b/ld/testsuite/ld-elf/dwarf.exp
+@@ -69,11 +69,11 @@ set run_tests {
+ }
+ 
+ # Disable all sanitizers.
+-set old_CFLAGS "$CFLAGS_FOR_TARGET"
+-append CFLAGS_FOR_TARGET " $NOSANITIZE_CFLAGS"
++set old_CFLAGS "$CFLAGS_FOR_TARGET_TEST"
++append CFLAGS_FOR_TARGET_TEST " $NOSANITIZE_CFLAGS"
+ run_cc_link_tests $build_tests
+ run_ld_link_exec_tests $run_tests
+-set CFLAGS_FOR_TARGET "$old_CFLAGS"
++set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
+ 
+ proc strip_test {} {
+     global ld
+diff --git a/ld/testsuite/ld-elf/shared.exp b/ld/testsuite/ld-elf/shared.exp
+index ee881c2d619..a24525a2ff8 100644
+--- a/ld/testsuite/ld-elf/shared.exp
++++ b/ld/testsuite/ld-elf/shared.exp
+@@ -972,7 +972,13 @@ append build_tests {
+    {pr26580-b.c} {} "libpr26580-2.so"}
+ }
+ 
++set old_CFLAGS "$CFLAGS_FOR_TARGET_TEST"
++set old_CXXFLAGS "$CXXFLAGS_FOR_TARGET_TEST"
++append CFLAGS_FOR_TARGET_TEST " $NOSANITIZE_CFLAGS"
++append CXXFLAGS_FOR_TARGET_TEST " $NOSANITIZE_CFLAGS"
+ run_cc_link_tests $build_tests
++set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
++set CXXFLAGS_FOR_TARGET_TEST "$old_CXXFLAGS"
+ 
+ run_cc_link_tests [list \
+     [list \
+@@ -1259,10 +1265,10 @@ if [check_libdl_available] {
+   # XFAIL on NetBSD ELF systems as they do not currently support the .*_array
+   # sections.
+   # Disable all sanitizers.
+-  set old_CFLAGS "$CFLAGS_FOR_TARGET"
+-  append CFLAGS_FOR_TARGET " $NOSANITIZE_CFLAGS"
++  set old_CFLAGS "$CFLAGS_FOR_TARGET_TEST"
++  append CFLAGS_FOR_TARGET_TEST " $NOSANITIZE_CFLAGS"
+   run_ld_link_exec_tests $dlopen_run_tests "*-*-netbsd*"
+-  set CFLAGS_FOR_TARGET "$old_CFLAGS"
++  set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
+ }
+ 
+ # Check --no-add-needed and --no-copy-dt-needed-entries
+diff --git a/ld/testsuite/ld-plugin/plugin.exp b/ld/testsuite/ld-plugin/plugin.exp
+index 38a40363681..2e148e4cbf8 100644
+--- a/ld/testsuite/ld-plugin/plugin.exp
++++ b/ld/testsuite/ld-plugin/plugin.exp
+@@ -87,11 +87,11 @@ set regcln "-plugin-opt registercleanup"
+ set failed_compile 0
+ set _ ""
+ set plugin_nm_output ""
+-set old_CFLAGS "$CFLAGS_FOR_TARGET"
+-append CFLAGS_FOR_TARGET " $NOSANITIZE_CFLAGS $NOLTO_CFLAGS"
++set old_CFLAGS "$CFLAGS_FOR_TARGET_TEST"
++append CFLAGS_FOR_TARGET_TEST " $NOSANITIZE_CFLAGS $NOLTO_CFLAGS"
+ if { [istarget m681*-*-*] || [istarget m68hc1*-*-*] || [istarget m9s12x*-*-*] } {
+     # otherwise get FAILS due to _.frame
+-    append CFLAGS_FOR_TARGET " -fomit-frame-pointer"
++    append CFLAGS_FOR_TARGET_TEST " -fomit-frame-pointer"
+ }
+ 
+ if { $can_compile && \
+@@ -291,7 +291,7 @@ if { !$can_compile || $failed_compile } {
+ 	    unsupported [lindex $testitem 0]
+ 	}
+     }
+-    set CFLAGS_FOR_TARGET "$old_CFLAGS"
++    set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
+     return
+ }
+ 
+@@ -394,4 +394,4 @@ if [ar_simple_create $ar "--plugin $plugin4_path" "tmpdir/libpr20070.a" \
+     unsupported "PR ld/20070"
+ }
+ 
+-set CFLAGS_FOR_TARGET "$old_CFLAGS"
++set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
+diff --git a/ld/testsuite/ld-shared/shared.exp b/ld/testsuite/ld-shared/shared.exp
+index 29de93a1957..e7f77fad567 100644
+--- a/ld/testsuite/ld-shared/shared.exp
++++ b/ld/testsuite/ld-shared/shared.exp
+@@ -67,8 +67,8 @@ set SHCFLAG ""
+ set shared_needs_pic "no"
+ 
+ # Disable all sanitizers.
+-set old_CFLAGS "$CFLAGS_FOR_TARGET"
+-append CFLAGS_FOR_TARGET " $NOSANITIZE_CFLAGS"
++set old_CFLAGS "$CFLAGS_FOR_TARGET_TEST"
++append CFLAGS_FOR_TARGET_TEST " $NOSANITIZE_CFLAGS"
+ 
+ if { [is_xcoff_format] } {
+     # Not all the useful features are available with AIX shared
+@@ -104,7 +104,7 @@ if [istarget arm*-*-linux*] {
+ 	set file [open $tmpdir/movw-detect.c w]
+ 	puts $file "void foo(void) { __asm (\"movw r0, #0\"); }"
+ 	close $file
+-	if [run_host_cmd_yesno "$CC_FOR_TARGET" "$CFLAGS_FOR_TARGET -c $tmpdir/movw-detect.c -o $tmpdir/movw-detect.o"] {
++	if [run_host_cmd_yesno "$CC_FOR_TARGET" "$CFLAGS_FOR_TARGET_TEST -c $tmpdir/movw-detect.c -o $tmpdir/movw-detect.o"] {
+ 	    set shared_needs_pic "yes"
+ 	}
+     }
+@@ -343,4 +343,4 @@ if ![ld_compile "$CC_FOR_TARGET $SHCFLAG $picflag" $srcdir/$subdir/main.c $tmpdi
+     }
+ }
+ 
+-set CFLAGS_FOR_TARGET "$old_CFLAGS"
++set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
+diff --git a/ld/testsuite/ld-srec/srec.exp b/ld/testsuite/ld-srec/srec.exp
+index bec59130425..5afc84c24b6 100644
+--- a/ld/testsuite/ld-srec/srec.exp
++++ b/ld/testsuite/ld-srec/srec.exp
+@@ -365,24 +365,24 @@ if { ![check_compiler_available] } {
+ # tests. Also add $NOPIE_CFLAGS and $NOPIE_LDFLAGS if PIE doesn't work
+ # with S-records.  Also add $NOCF_PROTECTION_CFLAGS for S-records.
+ # Also add $NOSANITIZE_CFLAGS for S-records.
+-set old_CFLAGS "$CFLAGS_FOR_TARGET"
+-append CFLAGS_FOR_TARGET " $PLT_CFLAGS $NOPIE_CFLAGS $NOPIE_LDFLAGS $NOCF_PROTECTION_CFLAGS $NOSANITIZE_CFLAGS $NOLTO_CFLAGS"
+-set old_CXXFLAGS "$CXXFLAGS_FOR_TARGET"
+-append CXXFLAGS_FOR_TARGET " $PLT_CFLAGS $NOPIE_CFLAGS $NOPIE_LDFLAGS $NOCF_PROTECTION_CFLAGS $NOSANITIZE_CFLAGS $NOLTO_CFLAGS"
++set old_CFLAGS "$CFLAGS_FOR_TARGET_TEST"
++append CFLAGS_FOR_TARGET_TEST " $PLT_CFLAGS $NOPIE_CFLAGS $NOPIE_LDFLAGS $NOCF_PROTECTION_CFLAGS $NOSANITIZE_CFLAGS $NOLTO_CFLAGS"
++set old_CXXFLAGS "$CXXFLAGS_FOR_TARGET_TEST"
++append CXXFLAGS_FOR_TARGET_TEST " $PLT_CFLAGS $NOPIE_CFLAGS $NOPIE_LDFLAGS $NOCF_PROTECTION_CFLAGS $NOSANITIZE_CFLAGS $NOLTO_CFLAGS"
+ 
+ # S-records can't handle .note.gnu.property sections.
+ if { [is_elf_format] \
+      && ([istarget "i?86-*-*"] || [istarget "x86_64-*-*"]) } {
+-    append CFLAGS_FOR_TARGET " -Wa,-mx86-used-note=no"
+-    append CXXFLAGS_FOR_TARGET " -Wa,-mx86-used-note=no"
++    append CFLAGS_FOR_TARGET_TEST " -Wa,-mx86-used-note=no"
++    append CXXFLAGS_FOR_TARGET_TEST " -Wa,-mx86-used-note=no"
+ }
+ 
+ if { ![ld_compile $CC_FOR_TARGET $srcdir/$subdir/sr1.c tmpdir/sr1.o] \
+      || ![ld_compile $CC_FOR_TARGET $srcdir/$subdir/sr2.c tmpdir/sr2.o] } {
+     unsupported $test1
+     unsupported $test2
+-    set CFLAGS_FOR_TARGET "$old_CFLAGS"
+-    set CXXFLAGS_FOR_TARGET "$old_CXXFLAGS"
++    set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
++    set CXXFLAGS_FOR_TARGET_TEST "$old_CXXFLAGS"
+     return
+ }
+ 
+@@ -454,15 +454,15 @@ run_srec_test $test1 "tmpdir/sr1.o tmpdir/sr2.o"
+ 
+ if { ![is_remote host] && [which $CXX_FOR_TARGET] == 0 } {
+     untested $test2
+-    set CFLAGS_FOR_TARGET "$old_CFLAGS"
+-    set CXXFLAGS_FOR_TARGET "$old_CXXFLAGS"
++    set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
++    set CXXFLAGS_FOR_TARGET_TEST "$old_CXXFLAGS"
+     return
+ }
+ 
+ if ![ld_compile "$CXX_FOR_TARGET -fno-exceptions" $srcdir/$subdir/sr3.cc tmpdir/sr3.o] {
+     unsupported $test2
+-    set CFLAGS_FOR_TARGET "$old_CFLAGS"
+-    set CXXFLAGS_FOR_TARGET "$old_CXXFLAGS"
++    set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
++    set CXXFLAGS_FOR_TARGET_TEST "$old_CXXFLAGS"
+     return
+ }
+ 
+@@ -488,5 +488,5 @@ setup_xfail "bpf-*-*"
+ 
+ run_srec_test $test2 "tmpdir/sr3.o"
+ 
+-set CFLAGS_FOR_TARGET "$old_CFLAGS"
+-set CXXFLAGS_FOR_TARGET "$old_CXXFLAGS"
++set CFLAGS_FOR_TARGET_TEST "$old_CFLAGS"
++set CXXFLAGS_FOR_TARGET_TEST "$old_CXXFLAGS"
+diff --git a/ld/testsuite/lib/ld-lib.exp b/ld/testsuite/lib/ld-lib.exp
+index 22d2f987b87..d1343eb12ca 100644
+--- a/ld/testsuite/lib/ld-lib.exp
++++ b/ld/testsuite/lib/ld-lib.exp
+@@ -253,6 +253,8 @@ proc default_ld_link { ld target objects } {
+ proc default_ld_compile { cc source object } {
+     global CFLAGS_FOR_TARGET
+     global CXXFLAGS_FOR_TARGET
++    global CFLAGS_FOR_TARGET_TEST
++    global CXXFLAGS_FOR_TARGET_TEST
+     global srcdir
+     global subdir
+     global host_triplet
+@@ -286,10 +288,14 @@ proc default_ld_compile { cc source object } {
+     }
+ 
+     set ccexe [string replace $ccexe 0 [string last "/" $ccexe] ""]
++    set cflag_test ""
++    set cxxflag_test ""
+     if {[string match "*++*" $ccexe]} {
+ 	append flags " $CXXFLAGS_FOR_TARGET"
++	set cflag_test "$CXXFLAGS_FOR_TARGET_TEST"
+     } else {
+ 	append flags " $CFLAGS_FOR_TARGET"
++	set cflag_test "$CFLAGS_FOR_TARGET_TEST"
+     }
+ 
+     if [board_info [target_info name] exists cflags] {
+@@ -300,7 +306,7 @@ proc default_ld_compile { cc source object } {
+ 	append flags " [board_info [target_info name] multilib_flags]"
+     }
+ 
+-    set cmd "$cc $flags $ccflags -c $source -o $object"
++    set cmd "$cc $flags $ccflags $cflag_test -c $source -o $object"
+     verbose -log "$cmd"
+ 
+     set status [remote_exec host [concat sh -c [list "$cmd 2>&1"]] "" "/dev/null" "ld.tmp"]
+@@ -727,6 +733,8 @@ proc run_ld_link_exec_tests { ldtests args } {
+     global env
+     global CC_FOR_TARGET
+     global CXX_FOR_TARGET
++    global CFLAGS_FOR_TARGET_TEST
++    global CXXFLAGS_FOR_TARGET_TEST
+     global errcnt
+     global exec_output
+     global STATIC_LDFLAGS
+@@ -780,9 +788,9 @@ proc run_ld_link_exec_tests { ldtests args } {
+ 	    lappend objfiles $objfile
+ 
+ 	    if { [ string match "c++" $lang ] } {
+-		set cmd "$CXX_FOR_TARGET -c $cflags"
++		set cmd "$CXX_FOR_TARGET -c $cflags $CXXFLAGS_FOR_TARGET_TEST"
+ 	    } else {
+-		set cmd "$CC_FOR_TARGET -c $cflags"
++		set cmd "$CC_FOR_TARGET -c $cflags $CFLAGS_FOR_TARGET_TEST"
+ 	    }
+ 	    if ![ld_compile $cmd $srcdir/$subdir/$src_file $objfile] {
+ 		set failed 1
+@@ -799,10 +807,10 @@ proc run_ld_link_exec_tests { ldtests args } {
+ 	    set link_cmd $ld
+ 	} elseif { [ string match "c++" $lang ] } {
+ 	    set link_proc ld_link
+-	    set link_cmd $CXX_FOR_TARGET
++	    set link_cmd "$CXX_FOR_TARGET $CXXFLAGS_FOR_TARGET_TEST"
+ 	} else {
+ 	    set link_proc ld_link
+-	    set link_cmd $CC_FOR_TARGET
++	    set link_cmd "$CC_FOR_TARGET $CFLAGS_FOR_TARGET_TEST"
+ 	}
+ 
+ 	if { $binfile eq "tmpdir/" } {
+@@ -888,6 +896,8 @@ proc run_cc_link_tests { ldtests } {
+     global env
+     global CC_FOR_TARGET
+     global CXX_FOR_TARGET
++    global CFLAGS_FOR_TARGET_TEST
++    global CXXFLAGS_FOR_TARGET_TEST
+     global ar
+     global exec_output
+     global STATIC_LDFLAGS
+@@ -969,9 +979,9 @@ proc run_cc_link_tests { ldtests } {
+ 	    lappend objfiles $objfile
+ 
+ 	    if { [ string match "c++" $lang ] } {
+-		set cmd "$CXX_FOR_TARGET -c $cflags"
++		set cmd "$CXX_FOR_TARGET $CXXFLAGS_FOR_TARGET_TEST -c $cflags"
+ 	    } else {
+-		set cmd "$CC_FOR_TARGET -c $cflags"
++		set cmd "$CC_FOR_TARGET $CFLAGS_FOR_TARGET_TEST -c $cflags"
+ 	    }
+ 	    if ![ld_compile $cmd $srcdir/$subdir/$src_file $objfile] {
+ 		set failed 1
+@@ -987,9 +997,9 @@ proc run_cc_link_tests { ldtests } {
+ 	reset_vars
+ 
+ 	if { [ string match "c++" $lang ] } {
+-	    set cc_cmd $CXX_FOR_TARGET
++	    set cc_cmd "$CXX_FOR_TARGET $CXXFLAGS_FOR_TARGET_TEST"
+ 	} else {
+-	    set cc_cmd $CC_FOR_TARGET
++	    set cc_cmd "$CC_FOR_TARGET $CFLAGS_FOR_TARGET_TEST"
+ 	}
+ 
+ 	if { $binfile eq "tmpdir/" } {
+-- 
+2.50.1
+
