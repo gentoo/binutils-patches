@@ -1,10 +1,7 @@
-From 6eafbdfab0ff4baecf85e095966f0e7f8b6e2fc8 Mon Sep 17 00:00:00 2001
-Message-ID: <6eafbdfab0ff4baecf85e095966f0e7f8b6e2fc8.1755459855.git.sam@gentoo.org>
-In-Reply-To: <35d2c802f63122702ac48296dac025470c5d1467.1755459855.git.sam@gentoo.org>
-References: <35d2c802f63122702ac48296dac025470c5d1467.1755459855.git.sam@gentoo.org>
+From ab490c8962810cab7d8eb788122012a1884c05ff Mon Sep 17 00:00:00 2001
 From: "H.J. Lu" <hjl.tools@gmail.com>
-Date: Sun, 17 Aug 2025 11:55:18 -0700
-Subject: [PATCH 2/3] x86-64: Add GLIBC_ABI_DT_X86_64_PLT version dependency
+Date: Sun, 17 Aug 2025 10:09:25 -0700
+Subject: [PATCH] x86-64: Add GLIBC_ABI_DT_X86_64_PLT version dependency
 
 On Linux/x86-64, programs and shared libraries created with -z mark-plt
 have the GLIBC_2.36 version tag dependency since -z mark-plt uses the
