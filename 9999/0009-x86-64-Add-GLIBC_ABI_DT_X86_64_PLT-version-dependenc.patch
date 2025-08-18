@@ -1,7 +1,10 @@
-From ab490c8962810cab7d8eb788122012a1884c05ff Mon Sep 17 00:00:00 2001
+From 9269afaad66f2d88126768e4c647ba711117bcca Mon Sep 17 00:00:00 2001
+Message-ID: <9269afaad66f2d88126768e4c647ba711117bcca.1755548203.git.sam@gentoo.org>
+In-Reply-To: <40fd19259a3b9a576bedba9f9ce236d2f1b42da9.1755548203.git.sam@gentoo.org>
+References: <40fd19259a3b9a576bedba9f9ce236d2f1b42da9.1755548203.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
-Date: Sun, 17 Aug 2025 10:09:25 -0700
-Subject: [PATCH] x86-64: Add GLIBC_ABI_DT_X86_64_PLT version dependency
+Date: Mon, 18 Aug 2025 13:13:21 -0700
+Subject: [PATCH 2/3] x86-64: Add GLIBC_ABI_DT_X86_64_PLT version dependency
 
 On Linux/x86-64, programs and shared libraries created with -z mark-plt
 have the GLIBC_2.36 version tag dependency since -z mark-plt uses the
@@ -68,7 +71,7 @@ index feb470fc477..de7cc410a99 100644
  
  extern void _bfd_elf_link_add_dt_relr_dependency
 diff --git a/bfd/elf64-x86-64.c b/bfd/elf64-x86-64.c
-index 03873a9ed6b..db3c20679a3 100644
+index edfa608d2d7..31a4b0ce489 100644
 --- a/bfd/elf64-x86-64.c
 +++ b/bfd/elf64-x86-64.c
 @@ -6246,7 +6246,7 @@ static void
