@@ -1,0 +1,204 @@
+From 5179e6a3d41c8e5df76065f24f5eec32e93b4584 Mon Sep 17 00:00:00 2001
+Message-ID: <5179e6a3d41c8e5df76065f24f5eec32e93b4584.1755575227.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Mon, 18 Aug 2025 18:37:00 -0700
+Subject: [PATCH] elf: Prune empty generic properties
+
+Prune empty generic properties before discarding empty property note
+section and leave processor specific properties to the backend.
+
+bfd/
+
+	PR ld/33292
+	* elf-properties.c (elf_prune_empty_properties): New function.
+	(_bfd_elf_link_setup_gnu_properties): Call
+	elf_prune_empty_properties before discarding empty property note
+	section.  Move indirect_extern_access processing before
+	elf_prune_empty_properties call.
+
+ld/
+
+	PR ld/33292
+	* testsuite/ld-x86-64/pr33292-x32.d: New file.
+	* testsuite/ld-x86-64/pr33292.d: Likewise.
+	* testsuite/ld-x86-64/pr33292.s: Likewise.
+	* testsuite/ld-x86-64/x86-64.exp: Run PR ld/33292 tests.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ bfd/elf-properties.c                 | 51 +++++++++++++++++++---------
+ ld/testsuite/ld-x86-64/pr33292-x32.d | 10 ++++++
+ ld/testsuite/ld-x86-64/pr33292.d     |  9 +++++
+ ld/testsuite/ld-x86-64/pr33292.s     | 34 +++++++++++++++++++
+ ld/testsuite/ld-x86-64/x86-64.exp    |  2 ++
+ 5 files changed, 90 insertions(+), 16 deletions(-)
+ create mode 100644 ld/testsuite/ld-x86-64/pr33292-x32.d
+ create mode 100644 ld/testsuite/ld-x86-64/pr33292.d
+ create mode 100644 ld/testsuite/ld-x86-64/pr33292.s
+
+diff --git a/bfd/elf-properties.c b/bfd/elf-properties.c
+index 07ab38098e6..73eb231d861 100644
+--- a/bfd/elf-properties.c
++++ b/bfd/elf-properties.c
+@@ -697,6 +697,23 @@ _bfd_elf_link_create_gnu_property_sec (struct bfd_link_info *info, bfd *elf_bfd,
+   return sec;
+ }
+ 
++/* Prune empty generic properties.  */
++
++static void
++elf_prune_empty_properties (elf_property_list **pp)
++{
++  elf_property_list *p;
++
++  while ((p = *pp) != NULL)
++    if ((p->property.pr_type < GNU_PROPERTY_LOPROC
++	 || p->property.pr_type >= GNU_PROPERTY_LOUSER)
++	&& p->property.pr_datasz != 0
++	&& p->property.pr_kind == property_number
++	&& p->property.u.number == 0)
++      *pp = p->next;
++    else
++      pp = &p->next;
++}
+ 
+ /* Set up GNU properties.  Return the first relocatable ELF input with
+    GNU properties if found.  Otherwise, return NULL.  */
+@@ -878,22 +895,6 @@ _bfd_elf_link_setup_gnu_properties (struct bfd_link_info *info)
+       if (bed->fixup_gnu_properties)
+ 	bed->fixup_gnu_properties (info, &elf_properties (first_pbfd));
+ 
+-      if (elf_properties (first_pbfd) == NULL)
+-	{
+-	  /* Discard .note.gnu.property section if all properties have
+-	     been removed.  */
+-	  sec->output_section = bfd_abs_section_ptr;
+-	  return NULL;
+-	}
+-
+-      /* Compute the section size.  */
+-      list = elf_properties (first_pbfd);
+-      size = elf_get_gnu_property_section_size (list, align_size);
+-
+-      /* Update .note.gnu.property section now.  */
+-      sec->size = size;
+-      contents = (bfd_byte *) bfd_zalloc (first_pbfd, size);
+-
+       if (info->indirect_extern_access <= 0)
+ 	{
+ 	  /* Get GNU_PROPERTY_1_NEEDED properties.  */
+@@ -917,6 +918,24 @@ _bfd_elf_link_setup_gnu_properties (struct bfd_link_info *info)
+ 	    }
+ 	}
+ 
++      elf_prune_empty_properties (&elf_properties (first_pbfd));
++
++      if (elf_properties (first_pbfd) == NULL)
++	{
++	  /* Discard .note.gnu.property section if all properties have
++	     been removed.  */
++	  sec->output_section = bfd_abs_section_ptr;
++	  return NULL;
++	}
++
++      /* Compute the section size.  */
++      list = elf_properties (first_pbfd);
++      size = elf_get_gnu_property_section_size (list, align_size);
++
++      /* Update .note.gnu.property section now.  */
++      sec->size = size;
++      contents = (bfd_byte *) bfd_zalloc (first_pbfd, size);
++
+       elf_write_gnu_properties (info, first_pbfd, contents, list, size,
+ 				align_size);
+ 
+diff --git a/ld/testsuite/ld-x86-64/pr33292-x32.d b/ld/testsuite/ld-x86-64/pr33292-x32.d
+new file mode 100644
+index 00000000000..0d6cf8115cd
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/pr33292-x32.d
+@@ -0,0 +1,10 @@
++#source: pr33292.s
++#as: --x32 -mx86-used-note=yes
++#ld: -shared -m elf32_x86_64 -z noindirect-extern-access
++#readelf: -n
++
++Displaying notes found in: .note.gnu.property
++[ 	]+Owner[ 	]+Data size[ 	]+Description
++  GNU                  0x[0-9a-f]+	NT_GNU_PROPERTY_TYPE_0
++      Properties: x86 feature used: x86
++	x86 ISA used: x86-64-baseline
+diff --git a/ld/testsuite/ld-x86-64/pr33292.d b/ld/testsuite/ld-x86-64/pr33292.d
+new file mode 100644
+index 00000000000..456b8499b57
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/pr33292.d
+@@ -0,0 +1,9 @@
++#as: --64 -defsym __64_bit__=1 -mx86-used-note=yes
++#ld: -shared -m elf_x86_64 -z noindirect-extern-access
++#readelf: -n
++
++Displaying notes found in: .note.gnu.property
++[ 	]+Owner[ 	]+Data size[ 	]+Description
++  GNU                  0x[0-9a-f]+	NT_GNU_PROPERTY_TYPE_0
++      Properties: x86 feature used: x86
++	x86 ISA used: x86-64-baseline
+diff --git a/ld/testsuite/ld-x86-64/pr33292.s b/ld/testsuite/ld-x86-64/pr33292.s
+new file mode 100644
+index 00000000000..8d14e880712
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/pr33292.s
+@@ -0,0 +1,34 @@
++	.section ".note.gnu.property", "a"
++.ifdef __64_bit__
++	.p2align 3
++.else
++	.p2align 2
++.endif
++	.long 1f - 0f		/* name length */
++	.long 5f - 2f		/* data length */
++	.long 5			/* note type */
++0:	.asciz "GNU"		/* vendor name */
++1:
++.ifdef __64_bit__
++	.p2align 3
++.else
++	.p2align 2
++.endif
++2:	.long 0xb0008000	/* pr_type.  */
++	.long 4f - 3f		/* pr_datasz.  */
++3:
++	.long 0x1
++4:
++.ifdef __64_bit__
++	.p2align 3
++.else
++	.p2align 2
++.endif
++5:
++
++	.text
++	.globl	foo
++	.type	foo, @function
++foo:
++	ret
++	.section	.note.GNU-stack
+diff --git a/ld/testsuite/ld-x86-64/x86-64.exp b/ld/testsuite/ld-x86-64/x86-64.exp
+index 0c66d1b26f7..9d975319cf5 100644
+--- a/ld/testsuite/ld-x86-64/x86-64.exp
++++ b/ld/testsuite/ld-x86-64/x86-64.exp
+@@ -568,6 +568,8 @@ run_dump_test "pr33260"
+ run_dump_test "pr33260-x32"
+ run_dump_test "pr33260-2"
+ run_dump_test "pr33260-2-x32"
++run_dump_test "pr33292"
++run_dump_test "pr33292-x32"
+ 
+ if { ![skip_sframe_tests] } {
+     run_dump_test "sframe-simple-1"
+
+base-commit: 7e432e93f8aaa14368476cf5eae9d55c18a266fb
+prerequisite-patch-id: f9e52c2b633aadd966330c2c4529c890981bac7e
+-- 
+2.51.0
+
