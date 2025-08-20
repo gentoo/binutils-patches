@@ -120,7 +120,6 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  ld/emulparams/elf_i386_fbsd.sh        |   1 +
  ld/emulparams/elf_i386_haiku.sh       |   1 +
  ld/emulparams/elf_x86_64.sh           |   2 +-
- ld/emulparams/elf_x86_64_cloudabi.sh  |   1 +
  ld/emulparams/elf_x86_64_fbsd.sh      |   1 +
  ld/emulparams/elf_x86_64_haiku.sh     |   1 +
  ld/emultempl/elf-i386-glibc.em        |  41 ++++++++
@@ -337,15 +336,6 @@ index b6fd466178e..1edce6e8703 100644
  }
  
  static const struct bfd_elf_special_section
-@@ -6355,6 +6373,8 @@ elf_x86_64_special_sections[]=
- 
- #include "elf64-target.h"
- 
-+#undef elf_backend_add_glibc_version_dependency
-+
- /* CloudABI support.  */
- 
- #undef	TARGET_LITTLE_SYM
 @@ -6479,6 +6499,10 @@ elf64_x86_64_copy_solaris_special_section_fields (const bfd *ibfd ATTRIBUTE_UNUS
  #define elf_backend_bfd_from_remote_memory \
    _bfd_elf32_bfd_from_remote_memory
@@ -776,14 +766,6 @@ index 92449745c7a..6e66f2e1035 100644
  GENERATE_SHLIB_SCRIPT=yes
  GENERATE_PIE_SCRIPT=yes
  NO_SMALL_DATA=yes
-diff --git a/ld/emulparams/elf_x86_64_cloudabi.sh b/ld/emulparams/elf_x86_64_cloudabi.sh
-index 1f8732ebbad..e605233391b 100644
---- a/ld/emulparams/elf_x86_64_cloudabi.sh
-+++ b/ld/emulparams/elf_x86_64_cloudabi.sh
-@@ -1,2 +1,3 @@
- source_sh ${srcdir}/emulparams/elf_x86_64.sh
-+EXTRA_EM_FILE="elf-x86-64"
- OUTPUT_FORMAT="elf64-x86-64-cloudabi"
 diff --git a/ld/emulparams/elf_x86_64_fbsd.sh b/ld/emulparams/elf_x86_64_fbsd.sh
 index 7ef974addca..17fdc83b075 100644
 --- a/ld/emulparams/elf_x86_64_fbsd.sh
