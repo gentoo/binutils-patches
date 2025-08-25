@@ -1,0 +1,931 @@
+From 0b2d86d4c1c26b6e1d48a5dc7842b21698d80abc Mon Sep 17 00:00:00 2001
+Message-ID: <0b2d86d4c1c26b6e1d48a5dc7842b21698d80abc.1756090103.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Sun, 24 Aug 2025 14:43:44 -0700
+Subject: [PATCH] x86: Don't put R_386_TLS_DESC/R_X86_64_TLSDESC in
+ .rel.plt/.rela.plt
+
+Since lazy tlsdesc relocation has data races:
+
+https://sourceware.org/bugzilla/show_bug.cgi?id=27137
+
+put R_386_TLS_DESC and R_X86_64_TLSDESC relocation in .rela.tls/.rel.tls
+section, instead of .rel.plt/.rela.plt section.
+
+Tested with glibc/i686 and glibc/x86-64 compiled with -mtls-dialect=gnu2
+as well as GCC 16 configured with --with-tls=gnu2.
+
+bfd/
+
+	PR ld/28387
+	* elf32-i386.c (elf_i386_relocate_section): Put R_386_TLS_DESC
+	in rel_tls_desc instead of elf.srelplt.
+	* elf64-x86-64.c (elf_x86_64_relocate_section): Put
+	R_X86_64_TLSDESC in rel_tls_desc instead of elf.srelplt.
+	* elfxx-x86.c (elf_x86_allocate_dynrelocs): Use rel_tls_desc,
+	instead of elf.srelplt, for GOT_TLS_GDESC_P.
+	(_bfd_elf_x86_get_reloc_section): New function.
+	(_bfd_x86_elf_late_size_sections): Use rel_tls_desc, instead of
+	elf.srelplt, for GOT_TLS_GDESC_P.  Remove next_tls_desc_index.
+	(_bfd_x86_elf_link_setup_gnu_properties): Allocate
+	.rela.tls/.rel.tls section for rel_tls_desc.
+	* elfxx-x86.h (elf_x86_link_hash_table): Add rel_tls_desc.
+	Remove next_tls_desc_index.
+	(_bfd_elf_x86_get_reloc_section): New.
+	(elf_backend_get_reloc_section): Likewise.
+
+ld/
+
+	PR ld/28387
+	* emulparams/elf32_x86_64.sh (OTHER_GOT_RELOC_SECTIONS): New.
+	* emulparams/elf_i386.sh (OTHER_GOT_RELOC_SECTIONS): Likewise.
+	* emulparams/elf_x86_64.sh (OTHER_GOT_RELOC_SECTIONS): Likewise.
+	* testsuite/ld-i386/i386.exp: Run pr28387.
+	* testsuite/ld-i386/pr17057.d: Adjusted
+	* testsuite/ld-i386/tlsdesc.rd: Likewise.
+	* testsuite/ld-i386/tlsdesc2.d: Likewise.
+	* testsuite/ld-i386/tlsgdesc.rd: Likewise.
+	* testsuite/ld-x86-64/tlsdesc.pd: Likewise.
+	* testsuite/ld-x86-64/tlsdesc.rd: Likewise.
+	* testsuite/ld-x86-64/tlsdesc2.d: Likewise.
+	* testsuite/ld-x86-64/tlsgdesc.rd: Likewise.
+	* testsuite/ld-i386/pr28387.d: New file.
+	* testsuite/ld-i386/pr28387.s: Likewise.
+	* testsuite/ld-x86-64/pr28387-x32.d: Likewise.
+	* testsuite/ld-x86-64/pr28387.d: Likewise.
+	* testsuite/ld-x86-64/pr28387.s: Likewise.
+	* testsuite/ld-x86-64/x86-64.exp: Run pr28387 and pr28387-x32.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ bfd/elf32-i386.c                     |  10 +-
+ bfd/elf64-x86-64.c                   |   2 +-
+ bfd/elfxx-x86.c                      |  23 ++++-
+ bfd/elfxx-x86.h                      |  13 ++-
+ ld/emulparams/elf32_x86_64.sh        |   2 +
+ ld/emulparams/elf_i386.sh            |   2 +
+ ld/emulparams/elf_x86_64.sh          |   2 +
+ ld/testsuite/ld-i386/i386.exp        |   1 +
+ ld/testsuite/ld-i386/pr17057.d       |   7 +-
+ ld/testsuite/ld-i386/pr28387.d       |  35 +++++++
+ ld/testsuite/ld-i386/pr28387.s       |  12 +++
+ ld/testsuite/ld-i386/tlsdesc.rd      | 106 ++++++++++----------
+ ld/testsuite/ld-i386/tlsdesc2.d      |   3 +-
+ ld/testsuite/ld-i386/tlsgdesc.rd     |   8 +-
+ ld/testsuite/ld-x86-64/pr28387-x32.d |  36 +++++++
+ ld/testsuite/ld-x86-64/pr28387.d     |  35 +++++++
+ ld/testsuite/ld-x86-64/pr28387.s     |  11 +++
+ ld/testsuite/ld-x86-64/tlsdesc.pd    |   8 +-
+ ld/testsuite/ld-x86-64/tlsdesc.rd    | 141 +++++++++++++--------------
+ ld/testsuite/ld-x86-64/tlsdesc2.d    |   4 +-
+ ld/testsuite/ld-x86-64/tlsgdesc.rd   |   8 +-
+ ld/testsuite/ld-x86-64/x86-64.exp    |   2 +
+ 22 files changed, 309 insertions(+), 162 deletions(-)
+ create mode 100644 ld/testsuite/ld-i386/pr28387.d
+ create mode 100644 ld/testsuite/ld-i386/pr28387.s
+ create mode 100644 ld/testsuite/ld-x86-64/pr28387-x32.d
+ create mode 100644 ld/testsuite/ld-x86-64/pr28387.d
+ create mode 100644 ld/testsuite/ld-x86-64/pr28387.s
+
+diff --git a/bfd/elf32-i386.c b/bfd/elf32-i386.c
+index 657563f2f4f..4b99b8e0202 100644
+--- a/bfd/elf32-i386.c
++++ b/bfd/elf32-i386.c
+@@ -3163,7 +3163,6 @@ elf_i386_relocate_section (bfd *output_bfd,
+ 
+ 	      if (GOT_TLS_GDESC_P (tls_type))
+ 		{
+-		  bfd_byte *loc;
+ 		  outrel.r_info = ELF32_R_INFO (indx, R_386_TLS_DESC);
+ 		  BFD_ASSERT (htab->sgotplt_jump_table_size + offplt + 8
+ 			      <= htab->elf.sgotplt->size);
+@@ -3171,13 +3170,8 @@ elf_i386_relocate_section (bfd *output_bfd,
+ 				     + htab->elf.sgotplt->output_offset
+ 				     + offplt
+ 				     + htab->sgotplt_jump_table_size);
+-		  sreloc = htab->elf.srelplt;
+-		  loc = sreloc->contents;
+-		  loc += (htab->next_tls_desc_index++
+-			  * sizeof (Elf32_External_Rel));
+-		  BFD_ASSERT (loc + sizeof (Elf32_External_Rel)
+-			      <= sreloc->contents + sreloc->size);
+-		  bfd_elf32_swap_reloc_out (output_bfd, &outrel, loc);
++		  sreloc = htab->rel_tls_desc;
++		  elf_append_rel (output_bfd, sreloc, &outrel);
+ 		  if (indx == 0)
+ 		    {
+ 		      BFD_ASSERT (! unresolved_reloc);
+diff --git a/bfd/elf64-x86-64.c b/bfd/elf64-x86-64.c
+index 580975b6d67..4f0e97c4a9a 100644
+--- a/bfd/elf64-x86-64.c
++++ b/bfd/elf64-x86-64.c
+@@ -4627,7 +4627,7 @@ elf_x86_64_relocate_section (bfd *output_bfd,
+ 				     + htab->elf.sgotplt->output_offset
+ 				     + offplt
+ 				     + htab->sgotplt_jump_table_size);
+-		  sreloc = htab->elf.srelplt;
++		  sreloc = htab->rel_tls_desc;
+ 		  if (indx == 0)
+ 		    outrel.r_addend = relocation - _bfd_x86_elf_dtpoff_base (info);
+ 		  else
+diff --git a/bfd/elfxx-x86.c b/bfd/elfxx-x86.c
+index 3de48397e78..6dc15864833 100644
+--- a/bfd/elfxx-x86.c
++++ b/bfd/elfxx-x86.c
+@@ -366,7 +366,7 @@ elf_x86_allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
+ 	htab->elf.srelgot->size += htab->sizeof_reloc;
+       if (GOT_TLS_GDESC_P (tls_type))
+ 	{
+-	  htab->elf.srelplt->size += htab->sizeof_reloc;
++	  htab->rel_tls_desc->size += htab->sizeof_reloc;
+ 	  if (bed->target_id == X86_64_ELF_DATA)
+ 	    htab->elf.tlsdesc_plt = (bfd_vma) -1;
+ 	}
+@@ -2157,6 +2157,16 @@ _bfd_elf_x86_finish_relative_relocs (struct bfd_link_info *info)
+   return true;
+ }
+ 
++asection *
++_bfd_elf_x86_get_reloc_section (bfd *abfd, const char *name)
++{
++  /* Treat .rel.tls/.rela.tls section the same as .rel.plt/.rela.plt
++     section.  */
++  if (strcmp (name, ".tls") == 0)
++    name = ".plt";
++  return _bfd_elf_plt_get_reloc_section (abfd, name);
++}
++
+ bool
+ _bfd_elf_x86_valid_reloc_p (asection *input_section,
+ 			    struct bfd_link_info *info,
+@@ -2376,7 +2386,7 @@ _bfd_x86_elf_late_size_sections (bfd *output_bfd,
+ 		    srel->size += htab->sizeof_reloc;
+ 		  if (GOT_TLS_GDESC_P (*local_tls_type))
+ 		    {
+-		      htab->elf.srelplt->size += htab->sizeof_reloc;
++		      htab->rel_tls_desc->size += htab->sizeof_reloc;
+ 		      if (bed->target_id == X86_64_ELF_DATA)
+ 			htab->elf.tlsdesc_plt = (bfd_vma) -1;
+ 		    }
+@@ -2417,7 +2427,6 @@ _bfd_x86_elf_late_size_sections (bfd *output_bfd,
+      so that R_{386,X86_64}_IRELATIVE entries come last.  */
+   if (htab->elf.srelplt)
+     {
+-      htab->next_tls_desc_index = htab->elf.srelplt->reloc_count;
+       htab->sgotplt_jump_table_size
+ 	= elf_x86_compute_jump_table_size (htab);
+       htab->next_irelative_index = htab->elf.srelplt->reloc_count - 1;
+@@ -4742,6 +4751,14 @@ _bfd_x86_elf_link_setup_gnu_properties
+ 	    }
+ 	}
+ 
++      sec = bfd_make_section_anyway_with_flags
++	(dynobj, bed->rela_plts_and_copies_p ? ".rela.tls" : ".rel.tls",
++	 bed->dynamic_sec_flags | SEC_READONLY);
++      if (sec == NULL
++	  || !bfd_set_section_alignment (sec, bed->s->log_file_align))
++	return false;
++      htab->rel_tls_desc = sec;
++
+       if (!info->no_ld_generated_unwind_info)
+ 	{
+ 	  flagword flags = (SEC_ALLOC | SEC_LOAD | SEC_READONLY
+diff --git a/bfd/elfxx-x86.h b/bfd/elfxx-x86.h
+index 2a28987f208..5593203f9ec 100644
+--- a/bfd/elfxx-x86.h
++++ b/bfd/elfxx-x86.h
+@@ -650,14 +650,14 @@ struct elf_x86_link_hash_table
+   /* The index of the next R_X86_64_IRELATIVE entry in .rela.plt.  */
+   bfd_vma next_irelative_index;
+ 
++  /* The .rela.tls/.rel.tls section for R_386_TLS_DESC or R_X86_64_TLSDESC
++     relocation.  */
++  asection *rel_tls_desc;
++
+   /* The (unloaded but important) .rel.plt.unloaded section on VxWorks.
+      This is used for i386 only.  */
+   asection *srelplt2;
+ 
+-  /* The index of the next unused R_386_TLS_DESC slot in .rel.plt.  This
+-     is only used for i386.  */
+-  bfd_vma next_tls_desc_index;
+-
+   /* DT_RELR bitmap.  */
+   struct elf_dt_relr_bitmap dt_relr_bitmap;
+ 
+@@ -871,6 +871,9 @@ extern bool _bfd_elf_x86_size_relative_relocs
+ extern bool _bfd_elf_x86_finish_relative_relocs
+   (struct bfd_link_info *) ATTRIBUTE_HIDDEN;
+ 
++extern asection * _bfd_elf_x86_get_reloc_section
++  (bfd *, const char *) ATTRIBUTE_HIDDEN;
++
+ extern void _bfd_elf32_write_addend 
+   (bfd *, uint64_t, void *) ATTRIBUTE_HIDDEN;
+ extern void _bfd_elf64_write_addend
+@@ -994,6 +997,8 @@ extern void _bfd_x86_elf_link_report_tls_transition_error
+   _bfd_elf_x86_size_relative_relocs
+ #define elf_backend_finish_relative_relocs \
+   _bfd_elf_x86_finish_relative_relocs
++#define elf_backend_get_reloc_section \
++  _bfd_elf_x86_get_reloc_section
+ #define elf_backend_use_mmap true
+ 
+ #define ELF_P_ALIGN ELF_MINPAGESIZE
+diff --git a/ld/emulparams/elf32_x86_64.sh b/ld/emulparams/elf32_x86_64.sh
+index 4db1a979058..8a07f50e47f 100644
+--- a/ld/emulparams/elf32_x86_64.sh
++++ b/ld/emulparams/elf32_x86_64.sh
+@@ -33,6 +33,8 @@ OTHER_PLT_SECTIONS="
+ .plt.got      ${RELOCATING-0} : { *(.plt.got) }
+ .plt.sec      ${RELOCATING-0} : { *(.plt.sec) }
+ "
++OTHER_GOT_RELOC_SECTIONS="
++  .rela.tls	${RELOCATING-0} : { *(.rela.tls) }"
+ 
+ if [ "x${host}" = "x${target}" ]; then
+   case " $EMULATION_LIBPATH " in
+diff --git a/ld/emulparams/elf_i386.sh b/ld/emulparams/elf_i386.sh
+index 51a650f692e..12d71f5ef9e 100644
+--- a/ld/emulparams/elf_i386.sh
++++ b/ld/emulparams/elf_i386.sh
+@@ -28,6 +28,8 @@ OTHER_PLT_SECTIONS="
+ .plt.got      ${RELOCATING-0} : { *(.plt.got) }
+ .plt.sec      ${RELOCATING-0} : { *(.plt.sec) }
+ "
++OTHER_GOT_RELOC_SECTIONS="
++  .rel.tls	${RELOCATING-0} : { *(.rel.tls) }"
+ 
+ # Linux modify the default library search path to first include
+ # a 32-bit specific directory.
+diff --git a/ld/emulparams/elf_x86_64.sh b/ld/emulparams/elf_x86_64.sh
+index 6e66f2e1035..4bab1489b94 100644
+--- a/ld/emulparams/elf_x86_64.sh
++++ b/ld/emulparams/elf_x86_64.sh
+@@ -34,6 +34,8 @@ OTHER_PLT_SECTIONS="
+ .plt.got      ${RELOCATING-0} : { *(.plt.got) }
+ .plt.sec      ${RELOCATING-0} : { *(.plt.sec) }
+ "
++OTHER_GOT_RELOC_SECTIONS="
++  .rela.tls	${RELOCATING-0} : { *(.rela.tls) }"
+ 
+ if [ "x${host}" = "x${target}" ]; then
+   case " $EMULATION_LIBPATH " in
+diff --git a/ld/testsuite/ld-i386/i386.exp b/ld/testsuite/ld-i386/i386.exp
+index 5b189ecb7f7..4ea46bbe901 100644
+--- a/ld/testsuite/ld-i386/i386.exp
++++ b/ld/testsuite/ld-i386/i386.exp
+@@ -522,6 +522,7 @@ run_dump_test "pr31047"
+ run_dump_test "pr32191"
+ run_dump_test "pr33260"
+ run_dump_test "pr33260-2"
++run_dump_test "pr28387"
+ 
+ if { !([istarget "i?86-*-linux*"]
+        || [istarget "i?86-*-gnu*"]
+diff --git a/ld/testsuite/ld-i386/pr17057.d b/ld/testsuite/ld-i386/pr17057.d
+index 29cc676a5af..af4e6c99276 100644
+--- a/ld/testsuite/ld-i386/pr17057.d
++++ b/ld/testsuite/ld-i386/pr17057.d
+@@ -3,7 +3,10 @@
+ #ld: -shared -melf_i386
+ #readelf: -r --wide
+ 
+-Relocation section '.rel.plt' at offset 0x[0-9a-f]+ contains 2 entries:
++Relocation section '.rel.dyn' at offset 0x[0-9a-f]+ contains 1 entry:
+  Offset     Info    Type                Sym. Value  Symbol's Name
+-[0-9a-f ]+R_386_JUMP_SLOT +0+ +foo
+ [0-9a-f ]+R_386_TLS_DESC +0+ +my_tls
++
++Relocation section '.rel.plt' at offset 0x[0-9a-f]+ contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name
++[0-9a-f ]+R_386_JUMP_SLOT +0+ +foo
+diff --git a/ld/testsuite/ld-i386/pr28387.d b/ld/testsuite/ld-i386/pr28387.d
+new file mode 100644
+index 00000000000..fd1e980142d
+--- /dev/null
++++ b/ld/testsuite/ld-i386/pr28387.d
+@@ -0,0 +1,35 @@
++#as: --32
++#ld: -shared -melf_i386 -z nocombreloc -z noseparate-code --no-ld-generated-unwind-info --hash-style=sysv
++#readelf: -d -r -S --wide
++
++There are [0-9]+ section headers, starting at offset 0x[0-9a-f]+:
++
++Section Headers:
++ +\[Nr\] Name +Type +Addr +Off +Size +ES Flg Lk Inf Al
++#...
++ +\[[ 0-9]+\] .rel.data +REL +0+128 0+128 0+8 08 +AI +2 +11 +4
++ +\[[ 0-9]+\] .rel.tls +REL +0+130 0+130 0+8 08 +AI +2 +10 +4
++ +\[[ 0-9]+\] .rel.plt +REL +0+138 0+138 0+8 08 +AI +2 +10 +4
++#...
++Dynamic section at offset 0x[0-9a-f]+ contains [0-9]+ entries:
++ +Tag +Type +Name/Value
++#...
++ 0x[0-9a-f]+ +\(PLTRELSZ\) +8 \(bytes\)
++ 0x[0-9a-f]+ +\(PLTREL\) +REL
++ 0x[0-9a-f]+ +\(JMPREL\) +0x138
++#...
++ 0x[0-9a-f]+ +\(REL\) +0x128
++ 0x[0-9a-f]+ +\(RELSZ\) +16 \(bytes\)
++ 0x[0-9a-f]+ +\(RELENT\) +8 \(bytes\)
++#...
++Relocation section '.rel.data' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name
++[0-9a-f]+ +[0-9a-f]+ +R_386_32 +0+ +foo
++
++Relocation section '.rel.tls' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name
++[0-9a-f]+ +[0-9a-f]+ +R_386_TLS_DESC +0+ +foo
++
++Relocation section '.rel.plt' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name
++[0-9a-f]+ +[0-9a-f]+ +R_386_JUMP_SLOT +0+ +bar
+diff --git a/ld/testsuite/ld-i386/pr28387.s b/ld/testsuite/ld-i386/pr28387.s
+new file mode 100644
+index 00000000000..beb318917b8
+--- /dev/null
++++ b/ld/testsuite/ld-i386/pr28387.s
+@@ -0,0 +1,12 @@
++	.text
++	.p2align 4
++	.globl	main
++	.type	main, @function
++main:
++	leal	foo@TLSDESC(%ebx), %eax
++	call	*foo@TLSCALL(%eax)
++	call	bar@PLT
++	ret
++	.data
++	.dc.a	foo
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/ld/testsuite/ld-i386/tlsdesc.rd b/ld/testsuite/ld-i386/tlsdesc.rd
+index ec418d1a1fc..ebd80b19928 100644
+--- a/ld/testsuite/ld-i386/tlsdesc.rd
++++ b/ld/testsuite/ld-i386/tlsdesc.rd
+@@ -14,7 +14,6 @@ Section Headers:
+  +\[[ 0-9]+\] \.dynsym +.*
+  +\[[ 0-9]+\] \.dynstr +.*
+  +\[[ 0-9]+\] \.rel.dyn +.*
+- +\[[ 0-9]+\] \.rel.plt +.*
+  +\[[ 0-9]+\] \.text +.*
+  +\[[ 0-9]+\] \.tdata +PROGBITS +[0-9a-f]+ [0-9a-f]+ 000060 00 WAT +0 +0 +1
+  +\[[ 0-9]+\] \.tbss +NOBITS +[0-9aa-f]+ [0-9a-f]+ 000020 00 WAT +0 +0 +1
+@@ -40,12 +39,12 @@ Program Headers:
+ 
+  Section to Segment mapping:
+  +Segment Sections...
+- +00 +.hash .dynsym .dynstr .rel.dyn .rel.plt .text *
++ +00 +.hash .dynsym .dynstr .rel.dyn .text *
+  +01 +.tdata .dynamic .got .got.plt *
+  +02 +.dynamic *
+  +03 +.tdata .tbss *
+ 
+-Relocation section '.rel.dyn' at offset 0x[0-9a-f]+ contains 20 entries:
++Relocation section '.rel.dyn' at offset 0x[0-9a-f]+ contains 25 entries:
+  Offset +Info +Type +Sym.Value +Sym. Name
+ [0-9a-f ]+R_386_TLS_TPOFF32
+ [0-9a-f ]+R_386_TLS_TPOFF *
+@@ -62,71 +61,68 @@ Relocation section '.rel.dyn' at offset 0x[0-9a-f]+ contains 20 entries:
+ [0-9a-f ]+R_386_TLS_TPOFF *
+ [0-9a-f ]+R_386_TLS_TPOFF *
+ [0-9a-f ]+R_386_TLS_TPOFF32
++[0-9a-f ]+R_386_TLS_DESC *
++[0-9a-f ]+R_386_TLS_DESC *
++[0-9a-f ]+R_386_TLS_DESC *
++[0-9a-f ]+R_386_TLS_DESC *
+ [0-9a-f ]+R_386_TLS_TPOFF +0+8 +sg3
+ [0-9a-f ]+R_386_TLS_TPOFF32 0+c +sg4
+ [0-9a-f ]+R_386_TLS_TPOFF +0+c +sg4
+ [0-9a-f ]+R_386_TLS_TPOFF +0+10 +sg5
+ [0-9a-f ]+R_386_TLS_TPOFF32 0+4 +sg2
+-
+-Relocation section '.rel.plt' at offset 0x[0-9a-f]+ contains 5 entries:
+- Offset +Info +Type +Sym.Value +Sym. Name
+ [0-9a-f ]+R_386_TLS_DESC * 0+ +sg1
+-[0-9a-f ]+R_386_TLS_DESC *
+-[0-9a-f ]+R_386_TLS_DESC *
+-[0-9a-f ]+R_386_TLS_DESC *
+-[0-9a-f ]+R_386_TLS_DESC *
+ 
+ Symbol table '\.dynsym' contains [0-9]+ entries:
+  +Num: +Value +Size +Type +Bind +Vis +Ndx +Name
+  +[0-9]+: 0+ +0 +NOTYPE +LOCAL +DEFAULT +UND *
+- +[0-9]+: 0+1c +0 +TLS +GLOBAL +DEFAULT +7 sg8
+- +[0-9]+: 0+8 +0 +TLS +GLOBAL +DEFAULT +7 sg3
+- +[0-9]+: 0+c +0 +TLS +GLOBAL +DEFAULT +7 sg4
+- +[0-9]+: 0+10 +0 +TLS +GLOBAL +DEFAULT +7 sg5
+- +[0-9]+: 0+ +0 +TLS +GLOBAL +DEFAULT +7 sg1
+- +[0-9]+: [0-9a-f]+ +0 +FUNC +GLOBAL +DEFAULT +6 fn1
+- +[0-9]+: 0+4 +0 +TLS +GLOBAL +DEFAULT +7 sg2
+- +[0-9]+: 0+14 +0 +TLS +GLOBAL +DEFAULT +7 sg6
+- +[0-9]+: 0+18 +0 +TLS +GLOBAL +DEFAULT +7 sg7
++ +[0-9]+: 0+1c +0 +TLS +GLOBAL +DEFAULT +6 sg8
++ +[0-9]+: 0+8 +0 +TLS +GLOBAL +DEFAULT +6 sg3
++ +[0-9]+: 0+c +0 +TLS +GLOBAL +DEFAULT +6 sg4
++ +[0-9]+: 0+10 +0 +TLS +GLOBAL +DEFAULT +6 sg5
++ +[0-9]+: 0+ +0 +TLS +GLOBAL +DEFAULT +6 sg1
++ +[0-9]+: [0-9a-f]+ +0 +FUNC +GLOBAL +DEFAULT +5 fn1
++ +[0-9]+: 0+4 +0 +TLS +GLOBAL +DEFAULT +6 sg2
++ +[0-9]+: 0+14 +0 +TLS +GLOBAL +DEFAULT +6 sg6
++ +[0-9]+: 0+18 +0 +TLS +GLOBAL +DEFAULT +6 sg7
+ 
+ Symbol table '\.symtab' contains [0-9]+ entries:
+  +Num: +Value +Size +Type +Bind +Vis +Ndx +Name
+  +[0-9]+: 0+ +0 +NOTYPE +LOCAL +DEFAULT +UND *
+ .* FILE +LOCAL +DEFAULT +ABS .*tlsdesc.o
+- +[0-9]+: 0+20 +0 +TLS +LOCAL +DEFAULT +7 sl1
+- +[0-9]+: 0+24 +0 +TLS +LOCAL +DEFAULT +7 sl2
+- +[0-9]+: 0+28 +0 +TLS +LOCAL +DEFAULT +7 sl3
+- +[0-9]+: 0+2c +0 +TLS +LOCAL +DEFAULT +7 sl4
+- +[0-9]+: 0+30 +0 +TLS +LOCAL +DEFAULT +7 sl5
+- +[0-9]+: 0+34 +0 +TLS +LOCAL +DEFAULT +7 sl6
+- +[0-9]+: 0+38 +0 +TLS +LOCAL +DEFAULT +7 sl7
+- +[0-9]+: 0+3c +0 +TLS +LOCAL +DEFAULT +7 sl8
++ +[0-9]+: 0+20 +0 +TLS +LOCAL +DEFAULT +6 sl1
++ +[0-9]+: 0+24 +0 +TLS +LOCAL +DEFAULT +6 sl2
++ +[0-9]+: 0+28 +0 +TLS +LOCAL +DEFAULT +6 sl3
++ +[0-9]+: 0+2c +0 +TLS +LOCAL +DEFAULT +6 sl4
++ +[0-9]+: 0+30 +0 +TLS +LOCAL +DEFAULT +6 sl5
++ +[0-9]+: 0+34 +0 +TLS +LOCAL +DEFAULT +6 sl6
++ +[0-9]+: 0+38 +0 +TLS +LOCAL +DEFAULT +6 sl7
++ +[0-9]+: 0+3c +0 +TLS +LOCAL +DEFAULT +6 sl8
+ .* FILE +LOCAL +DEFAULT +ABS 
+- +[0-9]+: 0+60 +0 +TLS +LOCAL +DEFAULT +8 sH1
+- +[0-9]+: 0+ +0 +TLS +LOCAL +DEFAULT +7 _TLS_MODULE_BASE_
+- +[0-9]+: [0-9a-f]+ +0 +OBJECT +LOCAL +DEFAULT +9 _DYNAMIC
+- +[0-9]+: 0+48 +0 +TLS +LOCAL +DEFAULT +7 sh3
+- +[0-9]+: 0+64 +0 +TLS +LOCAL +DEFAULT +8 sH2
+- +[0-9]+: 0+78 +0 +TLS +LOCAL +DEFAULT +8 sH7
+- +[0-9]+: 0+58 +0 +TLS +LOCAL +DEFAULT +7 sh7
+- +[0-9]+: 0+5c +0 +TLS +LOCAL +DEFAULT +7 sh8
+- +[0-9]+: 0+6c +0 +TLS +LOCAL +DEFAULT +8 sH4
+- +[0-9]+: 0+4c +0 +TLS +LOCAL +DEFAULT +7 sh4
+- +[0-9]+: 0+68 +0 +TLS +LOCAL +DEFAULT +8 sH3
+- +[0-9]+: 0+50 +0 +TLS +LOCAL +DEFAULT +7 sh5
+- +[0-9]+: 0+70 +0 +TLS +LOCAL +DEFAULT +8 sH5
+- +[0-9]+: 0+74 +0 +TLS +LOCAL +DEFAULT +8 sH6
+- +[0-9]+: 0+7c +0 +TLS +LOCAL +DEFAULT +8 sH8
+- +[0-9]+: 0+40 +0 +TLS +LOCAL +DEFAULT +7 sh1
+- +[0-9]+: [0-9a-f]+ +0 +OBJECT +LOCAL +DEFAULT +11 _GLOBAL_OFFSET_TABLE_
+- +[0-9]+: 0+44 +0 +TLS +LOCAL +DEFAULT +7 sh2
+- +[0-9]+: 0+54 +0 +TLS +LOCAL +DEFAULT +7 sh6
+- +[0-9]+: 0+1c +0 +TLS +GLOBAL +DEFAULT +7 sg8
+- +[0-9]+: 0+8 +0 +TLS +GLOBAL +DEFAULT +7 sg3
+- +[0-9]+: 0+c +0 +TLS +GLOBAL +DEFAULT +7 sg4
+- +[0-9]+: 0+10 +0 +TLS +GLOBAL +DEFAULT +7 sg5
+- +[0-9]+: 0+ +0 +TLS +GLOBAL +DEFAULT +7 sg1
+- +[0-9]+: [0-9a-f]+ +0 +FUNC +GLOBAL +DEFAULT +6 fn1
+- +[0-9]+: 0+4 +0 +TLS +GLOBAL +DEFAULT +7 sg2
+- +[0-9]+: 0+14 +0 +TLS +GLOBAL +DEFAULT +7 sg6
+- +[0-9]+: 0+18 +0 +TLS +GLOBAL +DEFAULT +7 sg7
++ +[0-9]+: 0+60 +0 +TLS +LOCAL +DEFAULT +7 sH1
++ +[0-9]+: 0+ +0 +TLS +LOCAL +DEFAULT +6 _TLS_MODULE_BASE_
++ +[0-9]+: [0-9a-f]+ +0 +OBJECT +LOCAL +DEFAULT +8 _DYNAMIC
++ +[0-9]+: 0+48 +0 +TLS +LOCAL +DEFAULT +6 sh3
++ +[0-9]+: 0+64 +0 +TLS +LOCAL +DEFAULT +7 sH2
++ +[0-9]+: 0+78 +0 +TLS +LOCAL +DEFAULT +7 sH7
++ +[0-9]+: 0+58 +0 +TLS +LOCAL +DEFAULT +6 sh7
++ +[0-9]+: 0+5c +0 +TLS +LOCAL +DEFAULT +6 sh8
++ +[0-9]+: 0+6c +0 +TLS +LOCAL +DEFAULT +7 sH4
++ +[0-9]+: 0+4c +0 +TLS +LOCAL +DEFAULT +6 sh4
++ +[0-9]+: 0+68 +0 +TLS +LOCAL +DEFAULT +7 sH3
++ +[0-9]+: 0+50 +0 +TLS +LOCAL +DEFAULT +6 sh5
++ +[0-9]+: 0+70 +0 +TLS +LOCAL +DEFAULT +7 sH5
++ +[0-9]+: 0+74 +0 +TLS +LOCAL +DEFAULT +7 sH6
++ +[0-9]+: 0+7c +0 +TLS +LOCAL +DEFAULT +7 sH8
++ +[0-9]+: 0+40 +0 +TLS +LOCAL +DEFAULT +6 sh1
++ +[0-9]+: [0-9a-f]+ +0 +OBJECT +LOCAL +DEFAULT +10 _GLOBAL_OFFSET_TABLE_
++ +[0-9]+: 0+44 +0 +TLS +LOCAL +DEFAULT +6 sh2
++ +[0-9]+: 0+54 +0 +TLS +LOCAL +DEFAULT +6 sh6
++ +[0-9]+: 0+1c +0 +TLS +GLOBAL +DEFAULT +6 sg8
++ +[0-9]+: 0+8 +0 +TLS +GLOBAL +DEFAULT +6 sg3
++ +[0-9]+: 0+c +0 +TLS +GLOBAL +DEFAULT +6 sg4
++ +[0-9]+: 0+10 +0 +TLS +GLOBAL +DEFAULT +6 sg5
++ +[0-9]+: 0+ +0 +TLS +GLOBAL +DEFAULT +6 sg1
++ +[0-9]+: [0-9a-f]+ +0 +FUNC +GLOBAL +DEFAULT +5 fn1
++ +[0-9]+: 0+4 +0 +TLS +GLOBAL +DEFAULT +6 sg2
++ +[0-9]+: 0+14 +0 +TLS +GLOBAL +DEFAULT +6 sg6
++ +[0-9]+: 0+18 +0 +TLS +GLOBAL +DEFAULT +6 sg7
+diff --git a/ld/testsuite/ld-i386/tlsdesc2.d b/ld/testsuite/ld-i386/tlsdesc2.d
+index b8569e893b8..c37557a94ef 100644
+--- a/ld/testsuite/ld-i386/tlsdesc2.d
++++ b/ld/testsuite/ld-i386/tlsdesc2.d
+@@ -3,8 +3,9 @@
+ #ld: -melf_i386 -shared -z now
+ #readelf: -d --wide
+ 
++#failif
+ #...
+ .*\(PLTRELSZ\).*
+ .*\(PLTREL\).*
+ .*\(JMPREL\).*
+-#pass
++#...
+diff --git a/ld/testsuite/ld-i386/tlsgdesc.rd b/ld/testsuite/ld-i386/tlsgdesc.rd
+index 0744aeb78b0..a129bf6f7e4 100644
+--- a/ld/testsuite/ld-i386/tlsgdesc.rd
++++ b/ld/testsuite/ld-i386/tlsgdesc.rd
+@@ -41,22 +41,22 @@ Program Headers:
+  +01 +.dynamic .got .got.plt *
+  +02 +.dynamic *
+ 
+-Relocation section '.rel.dyn' at offset 0x[0-9a-f]+ contains 8 entries:
++Relocation section '.rel.dyn' at offset 0x[0-9a-f]+ contains 10 entries:
+  Offset +Info +Type +Sym.Value +Sym. Name
+ [0-9a-f ]+R_386_TLS_TPOFF32 0+ +sG3
+ [0-9a-f ]+R_386_TLS_TPOFF +0+ +sG5
+ [0-9a-f ]+R_386_TLS_DTPMOD3 0+ +sG2
+ [0-9a-f ]+R_386_TLS_DTPOFF3 0+ +sG2
++[0-9a-f ]+R_386_TLS_DESC +0+ +sG2
+ [0-9a-f ]+R_386_TLS_TPOFF +0+ +sG4
+ [0-9a-f ]+R_386_TLS_TPOFF32 0+ +sG6
+ [0-9a-f ]+R_386_TLS_DTPMOD3 0+ +sG1
+ [0-9a-f ]+R_386_TLS_DTPOFF3 0+ +sG1
++[0-9a-f ]+R_386_TLS_DESC +0+ +sG1
+ 
+-Relocation section '.rel.plt' at offset 0x[0-9a-f]+ contains 3 entries:
++Relocation section '.rel.plt' at offset 0x[0-9a-f]+ contains 1 entry:
+  Offset +Info +Type +Sym.Value +Sym. Name
+ [0-9a-f ]+R_386_JUMP_SLOT +0+ +___tls_get_addr
+-[0-9a-f ]+R_386_TLS_DESC +0+ +sG1
+-[0-9a-f ]+R_386_TLS_DESC +0+ +sG2
+ 
+ Symbol table '\.dynsym' contains [0-9]+ entries:
+  +Num: +Value +Size +Type +Bind +Vis +Ndx +Name
+diff --git a/ld/testsuite/ld-x86-64/pr28387-x32.d b/ld/testsuite/ld-x86-64/pr28387-x32.d
+new file mode 100644
+index 00000000000..0302126014c
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/pr28387-x32.d
+@@ -0,0 +1,36 @@
++#source: pr28387.s
++#as: --x32
++#ld: -shared -melf32_x86_64 -z nocombreloc -z nomark-plt -z noseparate-code -z max-page-size=0x200000 --no-ld-generated-unwind-info --hash-style=sysv
++#readelf: -d -r -S --wide
++
++There are [0-9]+ section headers, starting at offset 0x[0-9a-f]+:
++
++Section Headers:
++ +\[Nr\] Name +Type +Addr +Off +Size +ES Flg Lk Inf Al
++#...
++ +\[[ 0-9]+\] .rela.data +RELA +0+128 0+128 0+c 0c +AI +2 +12 +4
++ +\[[ 0-9]+\] .rela.tls +RELA +0+134 0+134 0+c 0c +AI +2 +11 +4
++ +\[[ 0-9]+\] .rela.plt +RELA +0+140 0+140 0+c 0c +AI +2 +11 +4
++#...
++Dynamic section at offset 0x[0-9a-f]+ contains [0-9]+ entries:
++ +Tag +Type +Name/Value
++#...
++ 0x[0-9a-f]+ +\(PLTRELSZ\) +12 \(bytes\)
++ 0x[0-9a-f]+ +\(PLTREL\) +RELA
++ 0x[0-9a-f]+ +\(JMPREL\) +0x140
++#...
++ 0x[0-9a-f]+ +\(RELA\) +0x128
++ 0x[0-9a-f]+ +\(RELASZ\) +24 \(bytes\)
++ 0x[0-9a-f]+ +\(RELAENT\) +12 \(bytes\)
++#...
++Relocation section '.rela.data' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name \+ Addend
++[0-9a-f]+ +[0-9a-f]+ +R_X86_64_32 +0+ +foo \+ 0
++
++Relocation section '.rela.tls' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name \+ Addend
++[0-9a-f]+ +[0-9a-f]+ +R_X86_64_TLSDESC +0+ +foo \+ 0
++
++Relocation section '.rela.plt' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name \+ Addend
++[0-9a-f]+ +[0-9a-f]+ +R_X86_64_JUMP_SLOT +0+ +bar \+ 0
+diff --git a/ld/testsuite/ld-x86-64/pr28387.d b/ld/testsuite/ld-x86-64/pr28387.d
+new file mode 100644
+index 00000000000..07df0fbc5a7
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/pr28387.d
+@@ -0,0 +1,35 @@
++#as: --64
++#ld: -shared -melf_x86_64 -z nocombreloc -z nomark-plt -z noseparate-code -z max-page-size=0x200000 --no-ld-generated-unwind-info --hash-style=sysv
++#readelf: -d -r -S --wide
++
++There are [0-9]+ section headers, starting at offset 0x[0-9a-f]+:
++
++Section Headers:
++ +\[Nr\] Name +Type +Address +Off +Size +ES Flg Lk Inf Al
++#...
++ +\[[ 0-9]+\] .rela.data +RELA +0+1b8 0+1b8 0+18 18 +AI +2 +12 +8
++ +\[[ 0-9]+\] .rela.tls +RELA +0+1d0 0+1d0 0+18 18 +AI +2 +11 +8
++ +\[[ 0-9]+\] .rela.plt +RELA +0+1e8 0+1e8 0+18 18 +AI +2 +11 +8
++#...
++Dynamic section at offset 0x[0-9a-f]+ contains [0-9]+ entries:
++ +Tag +Type +Name/Value
++#...
++ 0x[0-9a-f]+ +\(PLTRELSZ\) +24 \(bytes\)
++ 0x[0-9a-f]+ +\(PLTREL\) +RELA
++ 0x[0-9a-f]+ +\(JMPREL\) +0x1e8
++#...
++ 0x[0-9a-f]+ +\(RELA\) +0x1b8
++ 0x[0-9a-f]+ +\(RELASZ\) +48 \(bytes\)
++ 0x[0-9a-f]+ +\(RELAENT\) +24 \(bytes\)
++#...
++Relocation section '.rela.data' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name \+ Addend
++[0-9a-f]+ +[0-9a-f]+ +R_X86_64_64 +0+ +foo \+ 0
++
++Relocation section '.rela.tls' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name \+ Addend
++[0-9a-f]+ +[0-9a-f]+ +R_X86_64_TLSDESC +0+ +foo \+ 0
++
++Relocation section '.rela.plt' at offset 0x[0-9a-f]+ contains 1 entry:
++ +Offset +Info +Type +Sym.* Value +Symbol's Name \+ Addend
++[0-9a-f]+ +[0-9a-f]+ +R_X86_64_JUMP_SLOT +0+ +bar \+ 0
+diff --git a/ld/testsuite/ld-x86-64/pr28387.s b/ld/testsuite/ld-x86-64/pr28387.s
+new file mode 100644
+index 00000000000..bbfa7b5f129
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/pr28387.s
+@@ -0,0 +1,11 @@
++	.text
++	.globl	main
++	.type	main, @function
++main:
++	leaq	foo@TLSDESC(%rip), %rax
++	call	*foo@TLSCALL(%rax)
++	call	bar@PLT
++	ret
++	.data
++	.dc.a	foo
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/ld/testsuite/ld-x86-64/tlsdesc.pd b/ld/testsuite/ld-x86-64/tlsdesc.pd
+index 490fc906c51..7e124ea32e5 100644
+--- a/ld/testsuite/ld-x86-64/tlsdesc.pd
++++ b/ld/testsuite/ld-x86-64/tlsdesc.pd
+@@ -10,10 +10,10 @@
+ Disassembly of section .plt:
+ 
+ [0-9a-f]+ <.plt>:
+- [0-9a-f]+:	ff 35 .. .. 20 00    	push   .*\(%rip\)        # 201358 <_GLOBAL_OFFSET_TABLE_\+0x8>
+- [0-9a-f]+:	ff 25 .. .. 20 00    	jmp    \*.*\(%rip\)        # 201360 <_GLOBAL_OFFSET_TABLE_\+0x10>
++ [0-9a-f]+:	ff 35 .. .. 20 00    	push   .*\(%rip\)        # 201328 <_GLOBAL_OFFSET_TABLE_\+0x8>
++ [0-9a-f]+:	ff 25 .. .. 20 00    	jmp    \*.*\(%rip\)        # 201330 <_GLOBAL_OFFSET_TABLE_\+0x10>
+  [0-9a-f]+:	0f 1f 40 00          	nopl   0x0\(%rax\)
+  [0-9a-f]+:	f3 0f 1e fa          	endbr64
+- [0-9a-f]+:	ff 35 .. .. 20 00    	push   .*\(%rip\)        # 201358 <_GLOBAL_OFFSET_TABLE_\+0x8>
+- [0-9a-f]+:	ff 25 .. .. 20 00    	jmp    \*.*\(%rip\)        # 201348 <.*>
++ [0-9a-f]+:	ff 35 .. .. 20 00    	push   .*\(%rip\)        # 201328 <_GLOBAL_OFFSET_TABLE_\+0x8>
++ [0-9a-f]+:	ff 25 .. .. 20 00    	jmp    \*.*\(%rip\)        # 201318 <.*>
+ 
+diff --git a/ld/testsuite/ld-x86-64/tlsdesc.rd b/ld/testsuite/ld-x86-64/tlsdesc.rd
+index 98bda5b2a39..14e945a8bae 100644
+--- a/ld/testsuite/ld-x86-64/tlsdesc.rd
++++ b/ld/testsuite/ld-x86-64/tlsdesc.rd
+@@ -14,14 +14,13 @@ Section Headers:
+  +\[[ 0-9]+\] .dynsym +.*
+  +\[[ 0-9]+\] .dynstr +.*
+  +\[[ 0-9]+\] .rela.dyn +.*
+- +\[[ 0-9]+\] .rela.plt +.*
+  +\[[ 0-9]+\] .plt +PROGBITS +0+3b0 0+3b0 0+20 10 +AX +0 +0 +(4|16)
+  +\[[ 0-9]+\] .text +PROGBITS +0+1000 0+1000 0+153 00 +AX +0 +0 4096
+  +\[[ 0-9]+\] .tdata +PROGBITS +0+201153 0+1153 0+60 00 WAT +0 +0 +1
+  +\[[ 0-9]+\] .tbss +NOBITS +0+2011b3 0+11b3 0+20 00 WAT +0 +0 +1
+- +\[[ 0-9]+\] .dynamic +DYNAMIC +0+2011b8 0+11b8 0+150 10 +WA +3 +0 +8
+- +\[[ 0-9]+\] .got +PROGBITS +0+201308 0+1308 0+48 08 +WA +0 +0 +8
+- +\[[ 0-9]+\] .got.plt +PROGBITS +0+201350 0+1350 0+68 08 +WA +0 +0 +8
++ +\[[ 0-9]+\] .dynamic +DYNAMIC +0+2011b8 0+11b8 0+120 10 +WA +3 +0 +8
++ +\[[ 0-9]+\] .got +PROGBITS +0+2012d8 0+12d8 0+48 08 +WA +0 +0 +8
++ +\[[ 0-9]+\] .got.plt +PROGBITS +0+201320 0+1320 0+68 08 +WA +0 +0 +8
+  +\[[ 0-9]+\] .symtab +.*
+  +\[[ 0-9]+\] .strtab +.*
+  +\[[ 0-9]+\] .shstrtab +.*
+@@ -35,18 +34,18 @@ There are [0-9]+ program headers, starting at offset [0-9]+
+ Program Headers:
+  +Type +Offset +VirtAddr +PhysAddr +FileSiz +MemSiz +Flg Align
+  +LOAD +0x0+ 0x0+ 0x0+ 0x[0-9a-f]+ 0x[0-9a-f]+ R E 0x200000
+- +LOAD +0x0+1153 0x0+201153 0x0+201153 0x0+265 0x0+265 RW +0x200000
+- +DYNAMIC +0x0+11b8 0x0+2011b8 0x0+2011b8 0x0+150 0x0+150 RW +0x8
++ +LOAD +0x0+1153 0x0+201153 0x0+201153 0x0+235 0x0+235 RW +0x200000
++ +DYNAMIC +0x0+11b8 0x0+2011b8 0x0+2011b8 0x0+120 0x0+120 RW +0x8
+  +TLS +0x0+1153 0x0+201153 0x0+201153 0x0+60 0x0+80 R +0x1
+ 
+  Section to Segment mapping:
+  +Segment Sections...
+- +00 +.hash .dynsym .dynstr .rela.dyn .rela.plt .plt .text *
++ +00 +.hash .dynsym .dynstr .rela.dyn .plt .text *
+  +01 +.tdata .dynamic .got .got.plt *
+  +02 +.dynamic *
+  +03 +.tdata .tbss *
+ 
+-Dynamic section at offset 0x[0-9a-f]+ contains 16 entries:
++Dynamic section at offset 0x[0-9a-f]+ contains 13 entries:
+  +Tag +Type +Name/Value
+  0x[0-9a-f]+ +\(HASH\).*
+  0x[0-9a-f]+ +\(STRTAB\).*
+@@ -54,87 +53,81 @@ Dynamic section at offset 0x[0-9a-f]+ contains 16 entries:
+  0x[0-9a-f]+ +\(STRSZ\).*
+  0x[0-9a-f]+ +\(SYMENT\).*
+  0x[0-9a-f]+ +\(PLTGOT\).*
+- 0x[0-9a-f]+ +\(PLTRELSZ\).*
+- 0x[0-9a-f]+ +\(PLTREL\).*
+- 0x[0-9a-f]+ +\(JMPREL\).*
+  0x[0-9a-f]+ +\(TLSDESC_PLT\) +0x3c0
+- 0x[0-9a-f]+ +\(TLSDESC_GOT\) +0x201348
++ 0x[0-9a-f]+ +\(TLSDESC_GOT\) +0x201318
+  0x[0-9a-f]+ +\(RELA\).*
+  0x[0-9a-f]+ +\(RELASZ\).*
+  0x[0-9a-f]+ +\(RELAENT\).*
+  0x[0-9a-f]+ +\(FLAGS\).*
+  0x[0-9a-f]+ +\(NULL\).*
+ 
+-Relocation section '.rela.dyn' at offset 0x[0-9a-f]+ contains 8 entries:
++Relocation section '.rela.dyn' at offset 0x[0-9a-f]+ contains 13 entries:
+  +Offset +Info +Type +Symbol's Value +Symbol's Name \+ Addend
+-0+201308 +[0-9a-f]+ R_X86_64_TPOFF64 +24
+-0+201310 +[0-9a-f]+ R_X86_64_TPOFF64 +30
+-0+201318 +[0-9a-f]+ R_X86_64_TPOFF64 +64
+-0+201328 +[0-9a-f]+ R_X86_64_TPOFF64 +50
+-0+201330 +[0-9a-f]+ R_X86_64_TPOFF64 +70
+-0+201340 +[0-9a-f]+ R_X86_64_TPOFF64 +44
+-0+201320 +[0-9a-f]+ R_X86_64_TPOFF64 +0+10 sg5 \+ 0
+-0+201338 +[0-9a-f]+ R_X86_64_TPOFF64 +0+4 sg2 \+ 0
+-
+-Relocation section '.rela.plt' at offset 0x[0-9a-f]+ contains 5 entries:
+- +Offset +Info +Type +Symbol's Value +Symbol's Name \+ Addend
+-0+201398 +[0-9a-f]+ R_X86_64_TLSDESC +0+ sg1 \+ 0
+-0+201368 +[0-9a-f]+ R_X86_64_TLSDESC +20
+-0+2013a8 +[0-9a-f]+ R_X86_64_TLSDESC +40
+-0+201378 +[0-9a-f]+ R_X86_64_TLSDESC +60
+-0+201388 +[0-9a-f]+ R_X86_64_TLSDESC +0
++0+2012d8 +[0-9a-f]+ R_X86_64_TPOFF64 +24
++0+2012e0 +[0-9a-f]+ R_X86_64_TPOFF64 +30
++0+2012e8 +[0-9a-f]+ R_X86_64_TPOFF64 +64
++0+2012f8 +[0-9a-f]+ R_X86_64_TPOFF64 +50
++0+201300 +[0-9a-f]+ R_X86_64_TPOFF64 +70
++0+201310 +[0-9a-f]+ R_X86_64_TPOFF64 +44
++0+201338 +[0-9a-f]+ R_X86_64_TLSDESC +20
++0+201348 +[0-9a-f]+ R_X86_64_TLSDESC +60
++0+201358 +[0-9a-f]+ R_X86_64_TLSDESC +0
++0+201378 +[0-9a-f]+ R_X86_64_TLSDESC +40
++0+2012f0 +[0-9a-f]+ R_X86_64_TPOFF64 +0+10 sg5 \+ 0
++0+201308 +[0-9a-f]+ R_X86_64_TPOFF64 +0+4 sg2 \+ 0
++0+201368 +[0-9a-f]+ R_X86_64_TLSDESC +0+ sg1 \+ 0
+ 
+ Symbol table '\.dynsym' contains [0-9]+ entries:
+  +Num: +Value +Size +Type +Bind +Vis +Ndx +Name
+  +[0-9]+: 0+ +0 +NOTYPE +LOCAL +DEFAULT +UND *
+- +[0-9]+: 0+1c +0 +TLS +GLOBAL +DEFAULT +8 sg8
+- +[0-9]+: 0+8 +0 +TLS +GLOBAL +DEFAULT +8 sg3
+- +[0-9]+: 0+c +0 +TLS +GLOBAL +DEFAULT +8 sg4
+- +[0-9]+: 0+10 +0 +TLS +GLOBAL +DEFAULT +8 sg5
+- +[0-9]+: 0+ +0 +TLS +GLOBAL +DEFAULT +8 sg1
+- +[0-9]+: 0+1000 +0 +FUNC +GLOBAL +DEFAULT +7 fn1
+- +[0-9]+: 0+4 +0 +TLS +GLOBAL +DEFAULT +8 sg2
+- +[0-9]+: 0+14 +0 +TLS +GLOBAL +DEFAULT +8 sg6
+- +[0-9]+: 0+18 +0 +TLS +GLOBAL +DEFAULT +8 sg7
++ +[0-9]+: 0+1c +0 +TLS +GLOBAL +DEFAULT +7 sg8
++ +[0-9]+: 0+8 +0 +TLS +GLOBAL +DEFAULT +7 sg3
++ +[0-9]+: 0+c +0 +TLS +GLOBAL +DEFAULT +7 sg4
++ +[0-9]+: 0+10 +0 +TLS +GLOBAL +DEFAULT +7 sg5
++ +[0-9]+: 0+ +0 +TLS +GLOBAL +DEFAULT +7 sg1
++ +[0-9]+: 0+1000 +0 +FUNC +GLOBAL +DEFAULT +6 fn1
++ +[0-9]+: 0+4 +0 +TLS +GLOBAL +DEFAULT +7 sg2
++ +[0-9]+: 0+14 +0 +TLS +GLOBAL +DEFAULT +7 sg6
++ +[0-9]+: 0+18 +0 +TLS +GLOBAL +DEFAULT +7 sg7
+ 
+ Symbol table '\.symtab' contains [0-9]+ entries:
+  +Num: +Value +Size +Type +Bind +Vis +Ndx +Name
+  +[0-9]+: 0+ +0 +NOTYPE +LOCAL +DEFAULT +UND *
+ .* FILE +LOCAL +DEFAULT +ABS .*tlsdesc.o
+- +[0-9]+: 0+20 +0 +TLS +LOCAL +DEFAULT +8 sl1
+- +[0-9]+: 0+24 +0 +TLS +LOCAL +DEFAULT +8 sl2
+- +[0-9]+: 0+28 +0 +TLS +LOCAL +DEFAULT +8 sl3
+- +[0-9]+: 0+2c +0 +TLS +LOCAL +DEFAULT +8 sl4
+- +[0-9]+: 0+30 +0 +TLS +LOCAL +DEFAULT +8 sl5
+- +[0-9]+: 0+34 +0 +TLS +LOCAL +DEFAULT +8 sl6
+- +[0-9]+: 0+38 +0 +TLS +LOCAL +DEFAULT +8 sl7
+- +[0-9]+: 0+3c +0 +TLS +LOCAL +DEFAULT +8 sl8
++ +[0-9]+: 0+20 +0 +TLS +LOCAL +DEFAULT +7 sl1
++ +[0-9]+: 0+24 +0 +TLS +LOCAL +DEFAULT +7 sl2
++ +[0-9]+: 0+28 +0 +TLS +LOCAL +DEFAULT +7 sl3
++ +[0-9]+: 0+2c +0 +TLS +LOCAL +DEFAULT +7 sl4
++ +[0-9]+: 0+30 +0 +TLS +LOCAL +DEFAULT +7 sl5
++ +[0-9]+: 0+34 +0 +TLS +LOCAL +DEFAULT +7 sl6
++ +[0-9]+: 0+38 +0 +TLS +LOCAL +DEFAULT +7 sl7
++ +[0-9]+: 0+3c +0 +TLS +LOCAL +DEFAULT +7 sl8
+ .* FILE +LOCAL +DEFAULT +ABS 
+- +[0-9]+: 0+60 +0 +TLS +LOCAL +DEFAULT +9 sH1
+- +[0-9]+: 0+ +0 +TLS +LOCAL +DEFAULT +8 _TLS_MODULE_BASE_
+- +[0-9]+: 0+2011b8 +0 +OBJECT +LOCAL +DEFAULT +10 _DYNAMIC
+- +[0-9]+: 0+48 +0 +TLS +LOCAL +DEFAULT +8 sh3
+- +[0-9]+: 0+64 +0 +TLS +LOCAL +DEFAULT +9 sH2
+- +[0-9]+: 0+78 +0 +TLS +LOCAL +DEFAULT +9 sH7
+- +[0-9]+: 0+58 +0 +TLS +LOCAL +DEFAULT +8 sh7
+- +[0-9]+: 0+5c +0 +TLS +LOCAL +DEFAULT +8 sh8
+- +[0-9]+: 0+6c +0 +TLS +LOCAL +DEFAULT +9 sH4
+- +[0-9]+: 0+4c +0 +TLS +LOCAL +DEFAULT +8 sh4
+- +[0-9]+: 0+68 +0 +TLS +LOCAL +DEFAULT +9 sH3
+- +[0-9]+: 0+50 +0 +TLS +LOCAL +DEFAULT +8 sh5
+- +[0-9]+: 0+70 +0 +TLS +LOCAL +DEFAULT +9 sH5
+- +[0-9]+: 0+74 +0 +TLS +LOCAL +DEFAULT +9 sH6
+- +[0-9]+: 0+7c +0 +TLS +LOCAL +DEFAULT +9 sH8
+- +[0-9]+: 0+40 +0 +TLS +LOCAL +DEFAULT +8 sh1
+- +[0-9]+: 0+201350 +0 +OBJECT +LOCAL +DEFAULT +12 _GLOBAL_OFFSET_TABLE_
+- +[0-9]+: 0+44 +0 +TLS +LOCAL +DEFAULT +8 sh2
+- +[0-9]+: 0+54 +0 +TLS +LOCAL +DEFAULT +8 sh6
+- +[0-9]+: 0+1c +0 +TLS +GLOBAL +DEFAULT +8 sg8
+- +[0-9]+: 0+8 +0 +TLS +GLOBAL +DEFAULT +8 sg3
+- +[0-9]+: 0+c +0 +TLS +GLOBAL +DEFAULT +8 sg4
+- +[0-9]+: 0+10 +0 +TLS +GLOBAL +DEFAULT +8 sg5
+- +[0-9]+: 0+ +0 +TLS +GLOBAL +DEFAULT +8 sg1
+- +[0-9]+: 0+1000 +0 +FUNC +GLOBAL +DEFAULT +7 fn1
+- +[0-9]+: 0+4 +0 +TLS +GLOBAL +DEFAULT +8 sg2
+- +[0-9]+: 0+14 +0 +TLS +GLOBAL +DEFAULT +8 sg6
+- +[0-9]+: 0+18 +0 +TLS +GLOBAL +DEFAULT +8 sg7
++ +[0-9]+: 0+60 +0 +TLS +LOCAL +DEFAULT +8 sH1
++ +[0-9]+: 0+ +0 +TLS +LOCAL +DEFAULT +7 _TLS_MODULE_BASE_
++ +[0-9]+: 0+2011b8 +0 +OBJECT +LOCAL +DEFAULT +9 _DYNAMIC
++ +[0-9]+: 0+48 +0 +TLS +LOCAL +DEFAULT +7 sh3
++ +[0-9]+: 0+64 +0 +TLS +LOCAL +DEFAULT +8 sH2
++ +[0-9]+: 0+78 +0 +TLS +LOCAL +DEFAULT +8 sH7
++ +[0-9]+: 0+58 +0 +TLS +LOCAL +DEFAULT +7 sh7
++ +[0-9]+: 0+5c +0 +TLS +LOCAL +DEFAULT +7 sh8
++ +[0-9]+: 0+6c +0 +TLS +LOCAL +DEFAULT +8 sH4
++ +[0-9]+: 0+4c +0 +TLS +LOCAL +DEFAULT +7 sh4
++ +[0-9]+: 0+68 +0 +TLS +LOCAL +DEFAULT +8 sH3
++ +[0-9]+: 0+50 +0 +TLS +LOCAL +DEFAULT +7 sh5
++ +[0-9]+: 0+70 +0 +TLS +LOCAL +DEFAULT +8 sH5
++ +[0-9]+: 0+74 +0 +TLS +LOCAL +DEFAULT +8 sH6
++ +[0-9]+: 0+7c +0 +TLS +LOCAL +DEFAULT +8 sH8
++ +[0-9]+: 0+40 +0 +TLS +LOCAL +DEFAULT +7 sh1
++ +[0-9]+: 0+201320 +0 +OBJECT +LOCAL +DEFAULT +11 _GLOBAL_OFFSET_TABLE_
++ +[0-9]+: 0+44 +0 +TLS +LOCAL +DEFAULT +7 sh2
++ +[0-9]+: 0+54 +0 +TLS +LOCAL +DEFAULT +7 sh6
++ +[0-9]+: 0+1c +0 +TLS +GLOBAL +DEFAULT +7 sg8
++ +[0-9]+: 0+8 +0 +TLS +GLOBAL +DEFAULT +7 sg3
++ +[0-9]+: 0+c +0 +TLS +GLOBAL +DEFAULT +7 sg4
++ +[0-9]+: 0+10 +0 +TLS +GLOBAL +DEFAULT +7 sg5
++ +[0-9]+: 0+ +0 +TLS +GLOBAL +DEFAULT +7 sg1
++ +[0-9]+: 0+1000 +0 +FUNC +GLOBAL +DEFAULT +6 fn1
++ +[0-9]+: 0+4 +0 +TLS +GLOBAL +DEFAULT +7 sg2
++ +[0-9]+: 0+14 +0 +TLS +GLOBAL +DEFAULT +7 sg6
++ +[0-9]+: 0+18 +0 +TLS +GLOBAL +DEFAULT +7 sg7
+diff --git a/ld/testsuite/ld-x86-64/tlsdesc2.d b/ld/testsuite/ld-x86-64/tlsdesc2.d
+index 86797579bac..d0f5ebf62a2 100644
+--- a/ld/testsuite/ld-x86-64/tlsdesc2.d
++++ b/ld/testsuite/ld-x86-64/tlsdesc2.d
+@@ -3,8 +3,8 @@
+ #ld: -melf_x86_64 -shared -z now
+ #readelf: -d --wide
+ 
+-#...
++#failif
+ .*\(PLTRELSZ\).*
+ .*\(PLTREL\).*
+ .*\(JMPREL\).*
+-#pass
++#...
+diff --git a/ld/testsuite/ld-x86-64/tlsgdesc.rd b/ld/testsuite/ld-x86-64/tlsgdesc.rd
+index ca8f19bf3f7..ef15ce94c5a 100644
+--- a/ld/testsuite/ld-x86-64/tlsgdesc.rd
++++ b/ld/testsuite/ld-x86-64/tlsgdesc.rd
+@@ -41,22 +41,22 @@ Program Headers:
+  +01 +.dynamic .got .got.plt *
+  +02 +.dynamic *
+ 
+-Relocation section '.rela.dyn' at offset 0x[0-9a-f]+ contains 8 entries:
++Relocation section '.rela.dyn' at offset 0x[0-9a-f]+ contains 10 entries:
+  +Offset +Info +Type +Symbol's Value +Symbol's Name \+ Addend
+ [0-9a-f]+ +0+100000012 R_X86_64_TPOFF64 +0+ sG3 \+ 0
+ [0-9a-f]+ +0+200000012 R_X86_64_TPOFF64 +0+ sG5 \+ 0
+ [0-9a-f]+ +0+300000010 R_X86_64_DTPMOD64 +0+ sG2 \+ 0
+ [0-9a-f]+ +0+300000011 R_X86_64_DTPOFF64 +0+ sG2 \+ 0
++[0-9a-f]+ +0+300000024 R_X86_64_TLSDESC +0+ sG2 \+ 0
+ [0-9a-f]+ +0+400000012 R_X86_64_TPOFF64 +0+ sG4 \+ 0
+ [0-9a-f]+ +0+600000012 R_X86_64_TPOFF64 +0+ sG6 \+ 0
+ [0-9a-f]+ +0+800000010 R_X86_64_DTPMOD64 +0+ sG1 \+ 0
+ [0-9a-f]+ +0+800000011 R_X86_64_DTPOFF64 +0+ sG1 \+ 0
++[0-9a-f]+ +0+800000024 R_X86_64_TLSDESC +0+ sG1 \+ 0
+ 
+-Relocation section '.rela.plt' at offset 0x[0-9a-f]+ contains 3 entries:
++Relocation section '.rela.plt' at offset 0x[0-9a-f]+ contains 1 entry:
+  +Offset +Info +Type +Symbol's Value +Symbol's Name \+ Addend
+ [0-9a-f]+ +0+500000007 R_X86_64_JUMP_SLOT +0+ __tls_get_addr \+ 0
+-[0-9a-f]+ +0+800000024 R_X86_64_TLSDESC +0+ sG1 \+ 0
+-[0-9a-f]+ +0+300000024 R_X86_64_TLSDESC +0+ sG2 \+ 0
+ 
+ Symbol table '\.dynsym' contains [0-9]+ entries:
+  +Num: +Value +Size +Type +Bind +Vis +Ndx +Name
+diff --git a/ld/testsuite/ld-x86-64/x86-64.exp b/ld/testsuite/ld-x86-64/x86-64.exp
+index 63cf1e45c14..5b759d8a5d0 100644
+--- a/ld/testsuite/ld-x86-64/x86-64.exp
++++ b/ld/testsuite/ld-x86-64/x86-64.exp
+@@ -570,6 +570,8 @@ run_dump_test "pr33260-2"
+ run_dump_test "pr33260-2-x32"
+ run_dump_test "pr33292"
+ run_dump_test "pr33292-x32"
++run_dump_test "pr28387"
++run_dump_test "pr28387-x32"
+ 
+ if { ![skip_sframe_tests] } {
+     run_dump_test "sframe-simple-1"
+
+base-commit: 8b7a074374f812a00f6f30be849f1b1f32bbe230
+-- 
+2.51.0
+
