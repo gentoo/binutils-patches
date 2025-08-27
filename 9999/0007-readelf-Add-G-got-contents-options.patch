@@ -1,0 +1,2031 @@
+From d10474f6defab5484fd8a9a79c3fa8588ca37396 Mon Sep 17 00:00:00 2001
+Message-ID: <d10474f6defab5484fd8a9a79c3fa8588ca37396.1756262897.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Tue, 26 Aug 2025 19:45:44 -0700
+Subject: [PATCH] readelf: Add -G/--got-contents options
+
+On Tue, Aug 26, 2025 at 02:53:40PM -0700, H.J. Lu wrote:
+> Add -G/--got-contents options to readelf, inspired by the similar option
+> on Solaris, to display the contents of GOT sections:
+>
+> $ readelf -G libfoo.so
+>
+> Global Offset Table '.got' contains 5 entries:
+>  Index:    Address       Reloc         Sym. Name + Addend/Value
+>      0: 000000002fc8 R_X86_64_GLOB_DAT bar + 0
+>      1: 000000002fd0 R_X86_64_GLOB_DAT __gmon_start__ + 0
+>      2: 000000002fd8 R_X86_64_GLOB_DAT _ITM_registerTMCloneTable + 0
+>      3: 000000002fe0 R_X86_64_GLOB_DAT __cxa_finalize@GLIBC_2.2.5 + 0
+>      4: 000000002fe8                   0
+>
+> Global Offset Table '.got.plt' contains 4 entries:
+>  Index:    Address       Reloc         Sym. Name + Addend/Value
+>      0: 000000002ff0                   2dd0
+>      1: 000000002ff8                   0
+>      2: 000000003000 R_X86_64_JUMP_SLO printf@GLIBC_2.2.5 + 2c0
+>      3: 000000003008                   0
+>
+> Any comments?
+>
+
+The updated patch with typo fix.
+
+H.J.
+---
+ binutils/NEWS                           |   3 +
+ binutils/doc/binutils.texi              |  11 +-
+ binutils/readelf.c                      | 896 +++++++++++++++++++-----
+ ld/testsuite/ld-i386/binutils.exp       |  45 ++
+ ld/testsuite/ld-i386/got-1.s            |   7 +
+ ld/testsuite/ld-i386/libgot-1a.rd       |   9 +
+ ld/testsuite/ld-i386/libgot-1b.rd       | 119 ++++
+ ld/testsuite/ld-i386/libgot-1c.rd       |  12 +
+ ld/testsuite/ld-i386/libgot-1d.rd       |  12 +
+ ld/testsuite/ld-x86-64/binutils.exp     |  59 ++
+ ld/testsuite/ld-x86-64/got-1.s          |   7 +
+ ld/testsuite/ld-x86-64/libgot-1a-x32.rd |   9 +
+ ld/testsuite/ld-x86-64/libgot-1a.rd     |   9 +
+ ld/testsuite/ld-x86-64/libgot-1b-x32.rd | 119 ++++
+ ld/testsuite/ld-x86-64/libgot-1b.rd     | 119 ++++
+ ld/testsuite/ld-x86-64/libgot-1c-x32.rd |  12 +
+ ld/testsuite/ld-x86-64/libgot-1c.rd     |  12 +
+ ld/testsuite/ld-x86-64/libgot-1d-x32.rd |  12 +
+ ld/testsuite/ld-x86-64/libgot-1d.rd     |  12 +
+ 19 files changed, 1317 insertions(+), 167 deletions(-)
+ create mode 100644 ld/testsuite/ld-i386/binutils.exp
+ create mode 100644 ld/testsuite/ld-i386/got-1.s
+ create mode 100644 ld/testsuite/ld-i386/libgot-1a.rd
+ create mode 100644 ld/testsuite/ld-i386/libgot-1b.rd
+ create mode 100644 ld/testsuite/ld-i386/libgot-1c.rd
+ create mode 100644 ld/testsuite/ld-i386/libgot-1d.rd
+ create mode 100644 ld/testsuite/ld-x86-64/binutils.exp
+ create mode 100644 ld/testsuite/ld-x86-64/got-1.s
+ create mode 100644 ld/testsuite/ld-x86-64/libgot-1a-x32.rd
+ create mode 100644 ld/testsuite/ld-x86-64/libgot-1a.rd
+ create mode 100644 ld/testsuite/ld-x86-64/libgot-1b-x32.rd
+ create mode 100644 ld/testsuite/ld-x86-64/libgot-1b.rd
+ create mode 100644 ld/testsuite/ld-x86-64/libgot-1c-x32.rd
+ create mode 100644 ld/testsuite/ld-x86-64/libgot-1c.rd
+ create mode 100644 ld/testsuite/ld-x86-64/libgot-1d-x32.rd
+ create mode 100644 ld/testsuite/ld-x86-64/libgot-1d.rd
+
+diff --git a/binutils/NEWS b/binutils/NEWS
+index ccda8559897..9af862a4735 100644
+--- a/binutils/NEWS
++++ b/binutils/NEWS
+@@ -1,5 +1,8 @@
+ -*- text -*-
+ 
++* Add -G/--got-contents options to readelf to display the contents of
++  Global Offset Table (GOT) sections.
++
+ * Internal changes to plugin support, and stricter target checking may result
+   in some errors being exposed in user options passed to the various binutils.
+   For example objcopy --target=TARGET now will only work if the input file is
+diff --git a/binutils/doc/binutils.texi b/binutils/doc/binutils.texi
+index 4543341e00c..15f31d1bcef 100644
+--- a/binutils/doc/binutils.texi
++++ b/binutils/doc/binutils.texi
+@@ -5036,6 +5036,7 @@ readelf [@option{-a}|@option{--all}]
+         [@option{-h}|@option{--file-header}]
+         [@option{-l}|@option{--program-headers}|@option{--segments}]
+         [@option{-S}|@option{--section-headers}|@option{--sections}]
++        [@option{-G}|@option{--got-contents}]
+         [@option{-g}|@option{--section-groups}]
+         [@option{-t}|@option{--section-details}]
+         [@option{-e}|@option{--headers}]
+@@ -5111,7 +5112,8 @@ given.
+ Equivalent to specifying @option{--file-header},
+ @option{--program-headers}, @option{--sections}, @option{--symbols},
+ @option{--relocs}, @option{--dynamic}, @option{--notes},
+-@option{--version-info}, @option{--arch-specific}, @option{--unwind},
++@option{--got-contents}, @option{--version-info},
++@option{--arch-specific}, @option{--unwind},
+ @option{--section-groups} and @option{--histogram}.
+ 
+ Note - this option does not enable @option{--use-dynamic} itself, so
+@@ -5143,6 +5145,13 @@ Suppress "no symbols" diagnostic.
+ Displays the information contained in the file's section headers, if it
+ has any.
+ 
++@item -G
++@itemx --got-contents
++@cindex ELF section information
++@cindex ELF reloc information
++Displays the contents of the file's Global Offset Table (GOT) sections,
++if it has any.
++
+ @item -g
+ @itemx --section-groups
+ @cindex ELF section group information
+diff --git a/binutils/readelf.c b/binutils/readelf.c
+index bb81c824ac3..15064daa969 100644
+--- a/binutils/readelf.c
++++ b/binutils/readelf.c
+@@ -229,6 +229,7 @@ static bool do_dyn_syms = false;
+ static bool do_lto_syms = false;
+ static bool do_reloc = false;
+ static bool do_sections = false;
++static bool do_got_section_contents = false;
+ static bool do_section_groups = false;
+ static bool do_section_details = false;
+ static bool do_segments = false;
+@@ -372,6 +373,21 @@ enum versioned_symbol_info
+   symbol_public
+ };
+ 
++/* Relocation entries */
++
++typedef struct elf_relocation
++{
++  bfd_vma r_offset;	/* Location at which to apply the action */
++  bfd_vma r_addend;	/* Constant addend used to compute value */
++  const char *r_name;	/* Relocation name.  */
++  char *r_symbol;	/* Relocation symbol.  */
++  relocation_type r_type; /* Relocation type.  */
++} elf_relocation;
++
++static elf_relocation *all_relocations_root;
++static elf_relocation *all_relocations;
++static size_t all_relocations_count;
++
+ static int
+ fseek64 (FILE *stream, int64_t offset, int whence)
+ {
+@@ -1767,6 +1783,32 @@ symcmp (const void *p, const void *q)
+   return sp->st_value > sq->st_value ? 1 : (sp->st_value < sq->st_value ? -1 : 0);
+ }
+ 
++static void
++update_all_relocations (size_t nentries)
++{
++  size_t sz;
++
++  if (!do_got_section_contents)
++    return;
++
++  if (!all_relocations_root)
++    {
++      sz = nentries * sizeof (elf_relocation);
++      all_relocations_root = (elf_relocation *) xmalloc (sz);
++      all_relocations = all_relocations_root;
++      all_relocations_count = nentries;
++    }
++  else
++    {
++      size_t orig_count = all_relocations_count;
++      sz = (orig_count + nentries) * sizeof (elf_relocation);
++      all_relocations_root = (elf_relocation *)
++	xrealloc (all_relocations_root, sz);
++      all_relocations = all_relocations_root + orig_count;
++      all_relocations_count += nentries;
++    }
++}
++
+ static uint64_t
+ count_relr_relocations (Filedata *          filedata,
+ 			Elf_Internal_Shdr * section)
+@@ -1836,7 +1878,8 @@ dump_relr_relocations (Filedata *          filedata,
+ 		       Elf_Internal_Sym *  symtab,
+ 		       uint64_t            nsyms,
+ 		       char *              strtab,
+-		       uint64_t            strtablen)
++		       uint64_t            strtablen,
++		       bool                dump_reloc)
+ {
+   uint64_t *  relrs;
+   uint64_t    nentries, i;
+@@ -1861,7 +1904,8 @@ dump_relr_relocations (Filedata *          filedata,
+     num_bits_in_entry = 63;
+   else
+     {
+-      warn (_("Unexpected entsize for RELR section\n"));
++      if (dump_reloc)
++	warn (_("Unexpected entsize for RELR section\n"));
+       return false;
+     }
+ 
+@@ -1875,6 +1919,161 @@ dump_relr_relocations (Filedata *          filedata,
+   if (symtab == NULL)
+     nsyms = 0;
+ 
++  const char *rtype = NULL;
++  if (do_got_section_contents)
++    switch (filedata->file_header.e_machine)
++      {
++      default:
++	break;
++
++      case EM_386:
++      case EM_IAMCU:
++	rtype = "R_386_RELATIVE";
++	break;
++
++      case EM_68K:
++	rtype = "R_68K_RELATIVE";
++	break;
++
++      case EM_860:
++	rtype = "R_860_RELATIVE";
++	break;
++
++      case EM_AARCH64:
++	rtype = "R_AARCH64_RELATIVE";
++	break;
++
++      case EM_AMDGPU:
++	rtype = "R_AMDGPU_RELATIVE64";
++	break;
++
++      case EM_ALPHA:
++	rtype = "R_ALPHA_RELATIVE";
++	break;
++
++      case EM_ALTERA_NIOS2:
++	rtype = "R_NIOS2_RELATIVE";
++	break;
++
++      case EM_ARM:
++	rtype = "R_ARM_RELATIVE";
++	break;
++
++      case EM_ARC:
++      case EM_ARC_COMPACT:
++      case EM_ARC_COMPACT2:
++      case EM_ARC_COMPACT3:
++      case EM_ARC_COMPACT3_64:
++	rtype = "R_ARC_RELATIVE";
++	break;
++
++      case EM_CRIS:
++	rtype = "R_CRIS_RELATIVE";
++	break;
++
++      case EM_CSKY:
++	rtype = "R_CKCORE_RELATIVE";
++	break;
++
++      case EM_KVX:
++	rtype = "R_KVX_RELATIVE";
++	break;
++
++      case EM_LATTICEMICO32:
++	rtype = "R_LM32_RELATIVE";
++	break;
++
++      case EM_LOONGARCH:
++	rtype = "R_LARCH_RELATIVE";
++	break;
++
++      case EM_M32R:
++      case EM_CYGNUS_M32R:
++	rtype = "R_M32R_RELATIVE";
++	break;
++
++      case EM_MCORE:
++	rtype = "R_MCORE_RELATIVE";
++	break;
++
++      case EM_METAG:
++	rtype = "R_METAG_RELATIVE";
++	break;
++
++      case EM_MN10300:
++      case EM_CYGNUS_MN10300:
++	rtype = "R_MN10300_RELATIVE";
++	break;
++
++      case EM_NDS32:
++	rtype = "R_NDS32_RELATIVE";
++	break;
++
++      case EM_OR1K:
++	rtype = "R_OR1K_RELATIVE";
++	break;
++
++      case EM_PPC:
++	rtype = "R_PPC_RELATIVE";
++	break;
++
++      case EM_PPC64:
++	rtype = "R_PPC64_RELATIVE";
++	break;
++
++      case EM_RISCV:
++	rtype = "R_RISCV_RELATIVE";
++	break;
++
++      case EM_S370:
++	rtype = "R_I370_RELATIVE";
++	break;
++
++      case EM_S390_OLD:
++      case EM_S390:
++	rtype = "R_390_RELATIVE";
++	break;
++
++      case EM_SH:
++	rtype = "R_SH_RELATIVE";
++	break;
++
++      case EM_OLD_SPARCV9:
++      case EM_SPARC32PLUS:
++      case EM_SPARCV9:
++      case EM_SPARC:
++	rtype = "R_SPARC_RELATIVE";
++	break;
++
++      case EM_TILEGX:
++	rtype = "R_TILEGX_RELATIVE";
++	break;
++
++      case EM_TILEPRO:
++	rtype = "R_TILEPRO_RELATIVE";
++	break;
++
++      case EM_V850:
++      case EM_CYGNUS_V850:
++	rtype = "R_V850_RELATIVE";
++	break;
++
++      case EM_VAX:
++	rtype = "R_VAX_RELATIVE";
++	break;
++
++      case EM_X86_64:
++      case EM_L1OM:
++      case EM_K1OM:
++	rtype = "R_X86_64_RELATIVE";
++	break;
++
++      case EM_XTENSA_OLD:
++      case EM_XTENSA:
++	rtype = "R_XTENSA_RELATIVE";
++	break;
++      }
++
+   if (symtab != NULL)
+     {
+       /* Symbol tables are not sorted on address, but we want a quick lookup
+@@ -1885,11 +2084,15 @@ dump_relr_relocations (Filedata *          filedata,
+       nsyms = filter_display_syms (filedata, symtab, nsyms, strtab, strtablen);
+     }
+ 
+-  if (relr_entsize == sizeof (Elf32_External_Relr))
+-    printf (_ ("Index: Entry    Address   Symbolic Address\n"));
+-  else
+-    printf (_ ("Index: Entry            Address           Symbolic Address\n"));
++  if (dump_reloc)
++    {
++      if (relr_entsize == sizeof (Elf32_External_Relr))
++	printf (_ ("Index: Entry    Address   Symbolic Address\n"));
++      else
++	printf (_ ("Index: Entry            Address           Symbolic Address\n"));
++    }
+ 
++  uint64_t r = 0;
+   for (i = 0; i < nentries; i++)
+     {
+       uint64_t entry;
+@@ -1899,16 +2102,34 @@ dump_relr_relocations (Filedata *          filedata,
+       else
+ 	entry = BYTE_GET (((Elf64_External_Relr *)relrs)[i].r_data);
+ 
+-      /* We assume that there will never be more than 9999 entries.  */
+-      printf (_("%04u:  "), (unsigned int) i);
+-      print_vma (entry, ZERO_HEX);
+-      printf (" ");
++      if (dump_reloc)
++	{
++	  /* We assume that there will never be more than 9999
++	     entries.  */
++	  printf (_("%04u:  "), (unsigned int) i);
++	  print_vma (entry, ZERO_HEX);
++	  printf (" ");
++	}
+ 
+       if ((entry & 1) == 0)
+ 	{
+ 	  where = entry;
+-	  print_relr_addr_and_sym (filedata, symtab, nsyms, strtab, where);
+-	  printf ("\n");
++	  if (dump_reloc)
++	    {
++	      print_relr_addr_and_sym (filedata, symtab, nsyms, strtab,
++				       where);
++	      printf ("\n");
++	    }
++
++	  if (do_got_section_contents)
++	    {
++	      all_relocations[r].r_offset = where;
++	      all_relocations[r].r_name = rtype;
++	      all_relocations[r].r_symbol = NULL;
++	      all_relocations[r].r_type = reltype_relr;
++	      r++;
++	    }
++
+ 	  where += relr_entsize;
+ 	}
+       else
+@@ -1921,7 +2142,7 @@ dump_relr_relocations (Filedata *          filedata,
+ 	    /* This can actually happen when the linker is allowed to shrink
+ 	       RELR sections.  For more details see: https://reviews.llvm.org/D67164. */
+ 	    continue;
+-	  else if (i == 0)
++	  else if (dump_reloc && i == 0)
+ 	    warn (_("Unusual RELR bitmap - no previous entry to set the base address\n"));
+ 
+ 	  for (j = 0; entry >>= 1; j++)
+@@ -1929,19 +2150,35 @@ dump_relr_relocations (Filedata *          filedata,
+ 	      {
+ 		uint64_t addr = where + (j * relr_entsize);
+ 
+-		if (first)
++		if (dump_reloc)
+ 		  {
+-		    print_relr_addr_and_sym (filedata, symtab, nsyms, strtab, addr);
+-		    first = false;
++		    if (first)
++		      {
++			print_relr_addr_and_sym (filedata, symtab, nsyms,
++						 strtab, addr);
++			first = false;
++		      }
++		    else
++		      {
++			printf (_("\n%*s "),
++				relr_entsize == 4 ? 15 : 23, " ");
++			print_relr_addr_and_sym (filedata, symtab, nsyms,
++						 strtab, addr);
++		      }
+ 		  }
+-		else
++
++		if (do_got_section_contents)
+ 		  {
+-		    printf (_("\n%*s "), relr_entsize == 4 ? 15 : 23, " ");
+-		    print_relr_addr_and_sym (filedata, symtab, nsyms, strtab, addr);
++		    all_relocations[r].r_offset = addr;
++		    all_relocations[r].r_name = rtype;
++		    all_relocations[r].r_symbol = NULL;
++		    all_relocations[r].r_type = reltype_relr;
++		    r++;
+ 		  }
+ 	      }
+ 
+-	  printf ("\n");
++	  if (dump_reloc)
++	    printf ("\n");
+ 	  where += num_bits_in_entry * relr_entsize;
+ 	}
+     }
+@@ -1962,7 +2199,8 @@ dump_relocations (Filedata *          filedata,
+ 		  char *              strtab,
+ 		  uint64_t            strtablen,
+ 		  relocation_type     rel_type,
+-		  bool                is_dynsym)
++		  bool                is_dynsym,
++		  bool                dump_reloc)
+ {
+   size_t i;
+   Elf_Internal_Rela * rels;
+@@ -1987,38 +2225,41 @@ dump_relocations (Filedata *          filedata,
+       return false;
+     }
+ 
+-  if (is_32bit_elf)
++  if (dump_reloc)
+     {
+-      if (rel_type == reltype_rela)
+-	{
+-	  if (do_wide)
+-	    printf (_(" Offset     Info    Type                Sym. Value  Symbol's Name + Addend\n"));
+-	  else
+-	    printf (_(" Offset     Info    Type            Sym.Value  Sym. Name + Addend\n"));
+-	}
+-      else
+-	{
+-	  if (do_wide)
+-	    printf (_(" Offset     Info    Type                Sym. Value  Symbol's Name\n"));
+-	  else
+-	    printf (_(" Offset     Info    Type            Sym.Value  Sym. Name\n"));
+-	}
+-    }
+-  else
+-    {
+-      if (rel_type == reltype_rela)
++      if (is_32bit_elf)
+ 	{
+-	  if (do_wide)
+-	    printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend\n"));
++	  if (rel_type == reltype_rela)
++	    {
++	      if (do_wide)
++		printf (_(" Offset     Info    Type                Sym. Value  Symbol's Name + Addend\n"));
++	      else
++		printf (_(" Offset     Info    Type            Sym.Value  Sym. Name + Addend\n"));
++	    }
+ 	  else
+-	    printf (_("  Offset          Info           Type           Sym. Value    Sym. Name + Addend\n"));
++	    {
++	      if (do_wide)
++		printf (_(" Offset     Info    Type                Sym. Value  Symbol's Name\n"));
++	      else
++		printf (_(" Offset     Info    Type            Sym.Value  Sym. Name\n"));
++	    }
+ 	}
+       else
+ 	{
+-	  if (do_wide)
+-	    printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name\n"));
++	  if (rel_type == reltype_rela)
++	    {
++	      if (do_wide)
++		printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend\n"));
++	      else
++		printf (_("  Offset          Info           Type           Sym. Value    Sym. Name + Addend\n"));
++	    }
+ 	  else
+-	    printf (_("  Offset          Info           Type           Sym. Value    Sym. Name\n"));
++	    {
++	      if (do_wide)
++		printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name\n"));
++	      else
++		printf (_("  Offset          Info           Type           Sym. Value    Sym. Name\n"));
++	    }
+ 	}
+     }
+ 
+@@ -2036,18 +2277,17 @@ dump_relocations (Filedata *          filedata,
+       type = get_reloc_type (filedata, inf);
+       symtab_index = get_reloc_symindex  (inf);
+ 
+-      if (is_32bit_elf)
+-	{
+-	  printf ("%8.8lx  %8.8lx ",
+-		  (unsigned long) offset & 0xffffffff,
+-		  (unsigned long) inf & 0xffffffff);
+-	}
+-      else
++      if (dump_reloc)
+ 	{
+-	  printf (do_wide
+-		  ? "%16.16" PRIx64 "  %16.16" PRIx64 " "
+-		  : "%12.12" PRIx64 "  %12.12" PRIx64 " ",
+-		  offset, inf);
++	  if (is_32bit_elf)
++	    printf ("%8.8lx  %8.8lx ",
++		    (unsigned long) offset & 0xffffffff,
++		    (unsigned long) inf & 0xffffffff);
++	  else
++	    printf (do_wide
++		    ? "%16.16" PRIx64 "  %16.16" PRIx64 " "
++		    : "%12.12" PRIx64 "  %12.12" PRIx64 " ",
++		    offset, inf);
+ 	}
+ 
+       switch (filedata->file_header.e_machine)
+@@ -2397,10 +2637,15 @@ dump_relocations (Filedata *          filedata,
+ 	  break;
+ 	}
+ 
+-      if (rtype == NULL)
+-	printf (_("unrecognized: %-7lx"), (unsigned long) type & 0xffffffff);
+-      else
+-	printf (do_wide ? "%-22s" : "%-17.17s", rtype);
++      char *symbol_name = NULL;
++      if (dump_reloc)
++	{
++	  if (rtype == NULL)
++	    printf (_("unrecognized: %-7lx"),
++		    (unsigned long) type & 0xffffffff);
++	  else
++	    printf (do_wide ? "%-22s" : "%-17.17s", rtype);
++	}
+ 
+       if (filedata->file_header.e_machine == EM_ALPHA
+ 	  && rtype != NULL
+@@ -2419,23 +2664,29 @@ dump_relocations (Filedata *          filedata,
+ 	    default: rtype = NULL;
+ 	    }
+ 
+-	  if (rtype)
+-	    printf (" (%s)", rtype);
+-	  else
++	  if (dump_reloc)
+ 	    {
+-	      putchar (' ');
+-	      printf (_("<unknown addend: %" PRIx64 ">"),
+-		      rels[i].r_addend);
+-	      res = false;
++	      if (rtype)
++		printf (" (%s)", rtype);
++	      else
++		{
++		  putchar (' ');
++		  printf (_("<unknown addend: %" PRIx64 ">"),
++			  rels[i].r_addend);
++		  res = false;
++		}
+ 	    }
+ 	}
+       else if (symtab_index)
+ 	{
+ 	  if (symtab == NULL || symtab_index >= nsyms)
+ 	    {
+-	      error (_(" bad symbol index: %08lx in reloc\n"),
+-		     (unsigned long) symtab_index);
+-	      res = false;
++	      if (dump_reloc)
++		{
++		  error (_(" bad symbol index: %08lx in reloc\n"),
++			 (unsigned long) symtab_index);
++		  res = false;
++		}
+ 	    }
+ 	  else
+ 	    {
+@@ -2454,7 +2705,8 @@ dump_relocations (Filedata *          filedata,
+ 					     &sym_info,
+ 					     &vna_other);
+ 
+-	      printf (" ");
++	      if (dump_reloc)
++		printf (" ");
+ 
+ 	      if (ELF_ST_TYPE (psym->st_info) == STT_GNU_IFUNC)
+ 		{
+@@ -2479,13 +2731,30 @@ dump_relocations (Filedata *          filedata,
+ 		  else
+ 		    name = strtab + psym->st_name;
+ 
+-		  len = print_symbol_name (width, name);
+-		  if (version_string)
+-		    printf (sym_info == symbol_public ? "@@%s" : "@%s",
+-			    version_string);
+-		  printf ("()%-*s", len <= width ? (width + 1) - len : 1, " ");
++		  if (do_got_section_contents)
++		    {
++		      if (version_string)
++			symbol_name = concat (name,
++					      sym_info == symbol_public
++					      ? "@@" : "@",
++					      version_string, NULL);
++		      else
++			symbol_name = xstrdup (name);
++		    }
++
++		  if (dump_reloc)
++		    {
++		      len = print_symbol_name (width, name);
++		      if (version_string)
++			printf (sym_info == symbol_public
++				? "@@%s" : "@%s",
++				version_string);
++		      printf ("()%-*s",
++			      len <= width ? (width + 1) - len : 1,
++			      " ");
++		    }
+ 		}
+-	      else
++	      else if (dump_reloc)
+ 		{
+ 		  print_vma (psym->st_value, LONG_HEX);
+ 
+@@ -2500,25 +2769,49 @@ dump_relocations (Filedata *          filedata,
+ 		    sec_name = printable_section_name_from_index
+ 		      (filedata, psym->st_shndx, NULL);
+ 
+-		  print_symbol_name (22, sec_name);
++		  if (do_got_section_contents)
++		    symbol_name = xstrdup (sec_name);
++		  if (dump_reloc)
++		    print_symbol_name (22, sec_name);
+ 		}
+ 	      else if (strtab == NULL)
+-		printf (_("<string table index: %3ld>"), psym->st_name);
++		{
++		  if (dump_reloc)
++		    printf (_("<string table index: %3ld>"),
++			    psym->st_name);
++		}
+ 	      else if (psym->st_name >= strtablen)
+ 		{
+-		  error (_("<corrupt string table index: %3ld>\n"),
+-			 psym->st_name);
+-		  res = false;
++		  if (dump_reloc)
++		    {
++		      error (_("<corrupt string table index: %3ld>\n"),
++			     psym->st_name);
++		      res = false;
++		    }
+ 		}
+ 	      else
+ 		{
+-		  print_symbol_name (22, strtab + psym->st_name);
+-		  if (version_string)
+-		    printf (sym_info == symbol_public ? "@@%s" : "@%s",
+-			    version_string);
++		  if (dump_reloc)
++		    {
++		      print_symbol_name (22, strtab + psym->st_name);
++		      if (version_string)
++			printf (sym_info == symbol_public
++				? "@@%s" : "@%s",
++				version_string);
++		    }
++		  if (all_relocations)
++		    {
++		      if (version_string)
++			symbol_name = concat (strtab + psym->st_name,
++					      sym_info == symbol_public
++					      ? "@@" : "@",
++					      version_string, NULL);
++		      else
++			symbol_name = xstrdup (strtab + psym->st_name);
++		    }
+ 		}
+ 
+-	      if (rel_type == reltype_rela)
++	      if (dump_reloc && rel_type == reltype_rela)
+ 		{
+ 		  uint64_t off = rels[i].r_addend;
+ 
+@@ -2529,7 +2822,7 @@ dump_relocations (Filedata *          filedata,
+ 		}
+ 	    }
+ 	}
+-      else if (rel_type == reltype_rela)
++      else if (dump_reloc && rel_type == reltype_rela)
+ 	{
+ 	  uint64_t off = rels[i].r_addend;
+ 
+@@ -2540,37 +2833,50 @@ dump_relocations (Filedata *          filedata,
+ 	    printf ("%" PRIx64, off);
+ 	}
+ 
+-      if (filedata->file_header.e_machine == EM_SPARCV9
+-	  && rtype != NULL
+-	  && streq (rtype, "R_SPARC_OLO10"))
+-	printf (" + %" PRIx64, ELF64_R_TYPE_DATA (inf));
+-
+-      putchar ('\n');
++      if (do_got_section_contents)
++	{
++	  all_relocations[i].r_offset = offset;
++	  all_relocations[i].r_name = rtype;
++	  all_relocations[i].r_symbol = symbol_name;
++	  all_relocations[i].r_addend = rels[i].r_addend;
++	  all_relocations[i].r_type = rel_type;
++	}
+ 
+-      if (! is_32bit_elf && filedata->file_header.e_machine == EM_MIPS)
++      if (dump_reloc)
+ 	{
+-	  uint64_t type2 = ELF64_MIPS_R_TYPE2 (inf);
+-	  uint64_t type3 = ELF64_MIPS_R_TYPE3 (inf);
+-	  const char * rtype2 = elf_mips_reloc_type (type2);
+-	  const char * rtype3 = elf_mips_reloc_type (type3);
++	  if (filedata->file_header.e_machine == EM_SPARCV9
++	      && rtype != NULL
++	      && streq (rtype, "R_SPARC_OLO10"))
++	    printf (" + %" PRIx64, ELF64_R_TYPE_DATA (inf));
+ 
+-	  printf ("                    Type2: ");
++	  putchar ('\n');
+ 
+-	  if (rtype2 == NULL)
+-	    printf (_("unrecognized: %-7lx"),
+-		    (unsigned long) type2 & 0xffffffff);
+-	  else
+-	    printf ("%-17.17s", rtype2);
++	  if (! is_32bit_elf
++	      && filedata->file_header.e_machine == EM_MIPS)
++	    {
++	      uint64_t type2 = ELF64_MIPS_R_TYPE2 (inf);
++	      uint64_t type3 = ELF64_MIPS_R_TYPE3 (inf);
++	      const char * rtype2 = elf_mips_reloc_type (type2);
++	      const char * rtype3 = elf_mips_reloc_type (type3);
+ 
+-	  printf ("\n                    Type3: ");
++	      printf ("                    Type2: ");
+ 
+-	  if (rtype3 == NULL)
+-	    printf (_("unrecognized: %-7lx"),
+-		    (unsigned long) type3 & 0xffffffff);
+-	  else
+-	    printf ("%-17.17s", rtype3);
++	      if (rtype2 == NULL)
++		printf (_("unrecognized: %-7lx"),
++			(unsigned long) type2 & 0xffffffff);
++	      else
++		printf ("%-17.17s", rtype2);
+ 
+-	  putchar ('\n');
++	      printf ("\n                    Type3: ");
++
++	      if (rtype3 == NULL)
++		printf (_("unrecognized: %-7lx"),
++			(unsigned long) type3 & 0xffffffff);
++	      else
++		printf ("%-17.17s", rtype3);
++
++	      putchar ('\n');
++	    }
+ 	}
+     }
+ 
+@@ -6112,6 +6418,7 @@ static struct option options[] =
+   {"use-dynamic",      no_argument, 0, 'D'},
+   {"dynamic",	       no_argument, 0, 'd'},
+   {"headers",	       no_argument, 0, 'e'},
++  {"got-contents",     no_argument, 0, 'G'},
+   {"section-groups",   no_argument, 0, 'g'},
+   {"help",	       no_argument, 0, 'H'},
+   {"file-header",      no_argument, 0, 'h'},
+@@ -6184,6 +6491,8 @@ usage (FILE * stream)
+   fprintf (stream, _("\
+      --sections          An alias for --section-headers\n"));
+   fprintf (stream, _("\
++  -G --got               Display GOT section contents\n"));
++  fprintf (stream, _("\
+   -g --section-groups    Display the section groups\n"));
+   fprintf (stream, _("\
+   -t --section-details   Display the section details\n"));
+@@ -6418,7 +6727,7 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
+     usage (stderr);
+ 
+   while ((c = getopt_long
+-	  (argc, argv, "ACDHILNPR:STU:VWXacdeghi:j:lnp:rstuvw::x:z", options, NULL)) != EOF)
++	  (argc, argv, "ACDGHILNPR:STU:VWXacdeghi:j:lnp:rstuvw::x:z", options, NULL)) != EOF)
+     {
+       switch (c)
+ 	{
+@@ -6442,8 +6751,13 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
+ 	  do_histogram = true;
+ 	  do_arch = true;
+ 	  do_notes = true;
++	  do_got_section_contents = true;
+ 	  break;
+ 
++	case 'G':
++	  do_got_section_contents = true;
++	  do_dump = true;
++	  break;
+ 	case 'g':
+ 	  do_section_groups = true;
+ 	  break;
+@@ -9438,7 +9752,8 @@ rel_type_from_sh_type (unsigned int sh_type)
+ 
+ static bool
+ display_relocations (Elf_Internal_Shdr *  section,
+-		     Filedata *           filedata)
++		     Filedata *           filedata,
++		     bool                 dump_reloc)
+ {
+   relocation_type rel_type = rel_type_from_sh_type (section->sh_type);
+ 
+@@ -9450,19 +9765,23 @@ display_relocations (Elf_Internal_Shdr *  section,
+   if (rel_size == 0)
+     return false;
+ 
+-  if (filedata->is_separate)
+-    printf (_("\nIn linked file '%s' relocation section "),
+-	    printable_string (filedata->file_name, 0));
+-  else
+-    printf (_("\nRelocation section "));
++  if (dump_reloc)
++    {
++      if (filedata->is_separate)
++	printf (_("\nIn linked file '%s' relocation section "),
++		printable_string (filedata->file_name, 0));
++      else
++	printf (_("\nRelocation section "));
+ 
+-  if (filedata->string_table == NULL)
+-    printf ("%d", section->sh_name);
+-  else
+-    printf ("'%s'", printable_section_name (filedata, section));
++      if (filedata->string_table == NULL)
++	printf ("%d", section->sh_name);
++      else
++	printf ("'%s'", printable_section_name (filedata, section));
++    }
+ 
+-  uint64_t num_rela = rel_size / section->sh_entsize;
+   uint64_t rel_offset = section->sh_offset;
++  uint64_t num_rela = rel_size / section->sh_entsize;
++  uint64_t num_reloc;
+ 
+   if (rel_type == reltype_relr)
+     {
+@@ -9471,26 +9790,33 @@ display_relocations (Elf_Internal_Shdr *  section,
+ 	 the number of words in the compressed RELR format.  So also provide
+ 	 the number of locations affected.  */
+ 
+-      uint64_t num_reloc = count_relr_relocations (filedata, section);
++      num_reloc = count_relr_relocations (filedata, section);
+ 
+-      printf (_(" at offset %#" PRIx64), rel_offset);
+-      printf (ngettext (" contains %" PRIu64 " entry which relocates",
+-			" contains %" PRIu64 " entries which relocate",
+-			num_rela), num_rela);
+-      printf (ngettext (" %" PRIu64 " location:\n",
+-			" %" PRIu64 " locations:\n",
+-			num_reloc), num_reloc);
++      if (dump_reloc)
++	{
++	  printf (_(" at offset %#" PRIx64), rel_offset);
++	  printf (ngettext (" contains %" PRIu64 " entry which relocates",
++			    " contains %" PRIu64 " entries which relocate",
++			    num_rela), num_rela);
++	  printf (ngettext (" %" PRIu64 " location:\n",
++			    " %" PRIu64 " locations:\n",
++			    num_reloc), num_reloc);
++	}
+     }
+   else
+     {
+-      printf (ngettext (" at offset %#" PRIx64
+-			" contains %" PRIu64 " entry:\n",
+-			" at offset %#" PRIx64
+-			" contains %" PRIu64 " entries:\n",
+-			num_rela),
+-	      rel_offset, num_rela);
++      num_reloc = num_rela;
++      if (dump_reloc)
++	printf (ngettext (" at offset %#" PRIx64
++			  " contains %" PRIu64 " entry:\n",
++			  " at offset %#" PRIx64
++			  " contains %" PRIu64 " entries:\n",
++			  num_rela),
++		rel_offset, num_rela);
+     }
+ 
++  update_all_relocations (num_reloc);
++
+   Elf_Internal_Shdr * symsec;
+   Elf_Internal_Sym *  symtab = NULL;
+   uint64_t            nsyms = 0;
+@@ -9522,12 +9848,15 @@ display_relocations (Elf_Internal_Shdr *  section,
+   bool res;
+ 
+   if (rel_type == reltype_relr)
+-    res = dump_relr_relocations (filedata, section, symtab, nsyms, strtab, strtablen);
++    res = dump_relr_relocations (filedata, section, symtab, nsyms,
++				 strtab, strtablen, dump_reloc);
+   else
+     res = dump_relocations (filedata, rel_offset, rel_size,
+ 			    symtab, nsyms, strtab, strtablen,
+ 			    rel_type,
+-			    symsec == NULL ? false : symsec->sh_type == SHT_DYNSYM);
++			    symsec == NULL
++			    ? false : symsec->sh_type == SHT_DYNSYM,
++			    dump_reloc);
+   free (strtab);
+   free (symtab);
+ 
+@@ -9541,14 +9870,16 @@ process_relocs (Filedata * filedata)
+ {
+   uint64_t rel_size;
+   uint64_t rel_offset;
++  unsigned int rel_entsz;
+ 
+-  if (!do_reloc)
++  if (!do_reloc && !do_got_section_contents)
+     return true;
+ 
+   if (do_using_dynamic)
+     {
+       relocation_type rel_type;
+       const char * name;
++      const char * entsz_name;
+       bool  has_dynamic_reloc;
+       unsigned int i;
+ 
+@@ -9556,57 +9887,97 @@ process_relocs (Filedata * filedata)
+ 
+       for (i = 0; i < ARRAY_SIZE (dynamic_relocations); i++)
+ 	{
++	  rel_size = filedata->dynamic_info[dynamic_relocations [i].size];
++
++	  if (!rel_size)
++	    continue;
++
++	  has_dynamic_reloc = true;
++
+ 	  rel_type = dynamic_relocations [i].rel_type;
+ 	  name = dynamic_relocations [i].name;
+-	  rel_size = filedata->dynamic_info[dynamic_relocations [i].size];
+ 	  rel_offset = filedata->dynamic_info[dynamic_relocations [i].reloc];
+ 
+-	  if (rel_size)
+-	    has_dynamic_reloc = true;
+-
+ 	  if (rel_type == reltype_unknown)
+ 	    {
+-	      if (dynamic_relocations [i].reloc == DT_JMPREL)
+-		switch (filedata->dynamic_info[DT_PLTREL])
+-		  {
+-		  case DT_REL:
+-		    rel_type = reltype_rel;
+-		    break;
+-		  case DT_RELA:
+-		    rel_type = reltype_rela;
+-		    break;
+-		  }
++	      if (dynamic_relocations [i].reloc != DT_JMPREL)
++		abort ();
++
++	      switch (filedata->dynamic_info[DT_PLTREL])
++		{
++		default:
++		  printf (_("<missing dynamic or corrupt tag: DT_PLTREL>\n"));
++		  continue;
++		case DT_REL:
++		  rel_type = reltype_rel;
++		  break;
++		case DT_RELA:
++		  rel_type = reltype_rela;
++		  break;
++		}
+ 	    }
+ 
+-	  if (rel_size)
++	  switch (rel_type)
++	    {
++	    default:
++	      abort ();
++	    case reltype_rel:
++	      rel_entsz = filedata->dynamic_info[DT_RELENT];
++	      entsz_name = "DT_RELENT";
++	      break;
++	    case reltype_rela:
++	      rel_entsz = filedata->dynamic_info[DT_RELAENT];
++	      entsz_name = "DT_RELAENT";
++	      break;
++	    case reltype_relr:
++	      rel_entsz = filedata->dynamic_info[DT_RELRENT];
++	      entsz_name = "DT_RELRENT";
++	      break;
++	    }
++
++	  if (do_reloc)
+ 	    {
+ 	      if (filedata->is_separate)
+ 		printf
+-		  (_("\nIn linked file '%s' section '%s' at offset %#" PRIx64
+-		     " contains %" PRId64 " bytes:\n"),
++		  (_("\nIn linked file '%s' section '%s' at offset"
++		     "%#" PRIx64 " contains %" PRId64 " bytes:\n"),
+ 		   filedata->file_name, name, rel_offset, rel_size);
+ 	      else
+ 		printf
+ 		  (_("\n'%s' relocation section at offset %#" PRIx64
+ 		     " contains %" PRId64 " bytes:\n"),
+ 		   name, rel_offset, rel_size);
++	    }
++
++	  if (rel_type != reltype_relr)
++	    {
++	      if (rel_entsz == 0)
++		{
++		  printf (_("<missing or corrupt dynamic tag: %s>\n"),
++			  entsz_name);
++		  continue;
++		}
++
++	      update_all_relocations (rel_size / rel_entsz);
+ 
+ 	      dump_relocations (filedata,
+-				offset_from_vma (filedata, rel_offset, rel_size),
++				offset_from_vma (filedata, rel_offset,
++						 rel_size),
+ 				rel_size,
+ 				filedata->dynamic_symbols,
+ 				filedata->num_dynamic_syms,
+ 				filedata->dynamic_strings,
+ 				filedata->dynamic_strings_length,
+-				rel_type, true /* is_dynamic */);
++				rel_type, true /* is_dynamic */,
++				do_reloc);
+ 	    }
+ 	}
+ 
+       if (is_ia64_vms (filedata))
+-        if (process_ia64_vms_dynamic_relocs (filedata))
++	if (process_ia64_vms_dynamic_relocs (filedata))
+ 	  has_dynamic_reloc = true;
+ 
+-      if (! has_dynamic_reloc)
++      if (do_reloc && ! has_dynamic_reloc)
+ 	{
+ 	  if (filedata->is_separate)
+ 	    printf (_("\nThere are no dynamic relocations in linked file '%s'.\n"),
+@@ -9625,11 +9996,11 @@ process_relocs (Filedata * filedata)
+ 	   i < filedata->file_header.e_shnum;
+ 	   i++, section++)
+ 	{
+-	  if (display_relocations (section, filedata))
++	  if (display_relocations (section, filedata, do_reloc))
+ 	    found = true;
+ 	}
+ 
+-      if (! found)
++      if (do_reloc && ! found)
+ 	{
+ 	  /* Users sometimes forget the -D option, so try to be helpful.  */
+ 	  for (i = 0; i < ARRAY_SIZE (dynamic_relocations); i++)
+@@ -17613,7 +17984,7 @@ process_section_contents (Filedata * filedata)
+ 	    case SHT_RELA:
+ 	    case SHT_REL:
+ 	    case SHT_RELR:
+-	      res &= display_relocations (section, filedata);
++	      res &= display_relocations (section, filedata, true);
+ 	      break;
+ 
+ 	    case SHT_NOTE:
+@@ -17704,6 +18075,196 @@ process_section_contents (Filedata * filedata)
+   return res;
+ }
+ 
++static int
++elf_relocation_cmp (const void *p, const void *q)
++{
++  elf_relocation *rp = (elf_relocation *) p;
++  elf_relocation *rq = (elf_relocation *) q;
++
++  return (rp->r_offset > rq->r_offset
++	  ? 1
++	  : (rp->r_offset < rq->r_offset ? -1 : 0));
++}
++
++static void
++display_elf_relocation_at (uint64_t offset, uint64_t g)
++{
++  bool matched = false;
++
++  for (size_t i = 0; i < all_relocations_count; i++)
++    if (all_relocations_root[i].r_offset == offset)
++      {
++	if (do_wide)
++	  printf (" %-22s", all_relocations_root[i].r_name);
++	else
++	  printf (" %-17.17s", all_relocations_root[i].r_name);
++
++	uint64_t off;
++	switch (all_relocations_root[i].r_type)
++	  {
++	  default:
++	    abort ();
++	  case reltype_rel:
++	  case reltype_relr:
++	    off = g;
++	    break;
++	  case reltype_rela:
++	    off = all_relocations_root[i].r_addend;
++	    break;
++	  }
++
++	if (all_relocations_root[i].r_symbol)
++	  {
++	    printf (" %s", all_relocations_root[i].r_symbol);
++	    if ((int64_t) off < 0)
++	      printf (" - %" PRIx64, -off);
++	    else
++	      printf (" + %" PRIx64, off);
++	  }
++	else
++	  {
++	    if ((int64_t) off < 0)
++	      printf (" -%" PRIx64, -off);
++	    else
++	      printf (" %" PRIx64, off);
++	  }
++
++	matched = true;
++	break;
++      }
++    else if (all_relocations_root[i].r_offset > offset)
++      break;
++
++  if (!matched)
++    {
++      if (do_wide)
++	printf ("%*c", 24, ' ');
++      else
++	printf ("%*c", 19, ' ');
++      printf ("%" PRIx64, g);
++    }
++}
++
++static bool
++process_got_section_contents (Filedata * filedata)
++{
++  Elf_Internal_Shdr * section;
++  unsigned int i;
++  uint64_t entries;
++  unsigned char *data;
++  bool res = true;
++
++  if (! do_got_section_contents)
++    return res;
++
++  qsort (all_relocations_root, all_relocations_count,
++	 sizeof (elf_relocation), elf_relocation_cmp);
++
++  initialise_dumps_byname (filedata);
++
++  for (i = 0, section = filedata->section_headers;
++       i < filedata->file_header.e_shnum;
++       i++, section++)
++    if (section->sh_type == SHT_PROGBITS
++	&& section->sh_size != 0)
++      {
++	const char *name = printable_section_name (filedata, section);
++
++	if (!startswith (name, ".got"))
++	  continue;
++
++	data = (unsigned char *) get_section_contents (section,
++						       filedata);
++	if (data == NULL)
++	  {
++	    res = false;
++	    goto out;
++	  }
++
++	uint32_t entsz = section->sh_entsize;
++	entries = section->sh_size / entsz;
++	if (entries == 1)
++	  printf (_("\nGlobal Offset Table '%s' contains 1 entry:\n"),
++		  name);
++	else
++	  printf (_("\nGlobal Offset Table '%s' contains %" PRIu64
++		    " entries:\n"), name, entries);
++
++	uint64_t g;
++
++	if (is_32bit_elf)
++	  {
++	    uint32_t j, n = entries;
++	    uint32_t addr;
++	    struct got32
++	      {
++		unsigned char bytes[4];
++	      } *got;
++
++	    if (do_wide)
++	      printf (_("   Index:  Address      Reloc             Sym. Name + Addend/Value\n"));
++		      /* |---9---| |---8--| |---------22---------| |...........  */
++	    else
++	      printf (_(" Index:  Address      Reloc        Sym. Name + Addend/Value\n"));
++		      /* |--7--| |---8--| |-------17------| |...........  */
++	    addr = section->sh_addr;
++	    got = (struct got32 *) data;
++
++	    for (j = 0; j < n; j++)
++	      {
++		g = BYTE_GET (got[j].bytes);
++		if (do_wide)
++		  printf ("%8" PRIu32 ": %8.8" PRIx32, j, addr);
++		else
++		  printf ("%6" PRIu32 ": %8.8" PRIx32, j, addr);
++		display_elf_relocation_at (addr, g);
++		putchar ('\n');
++		addr += entsz;
++	      }
++	  }
++	else
++	  {
++	    uint64_t j, addr;
++	    struct got64
++	      {
++		unsigned char bytes[4];
++	      } *got;
++
++	    if (do_wide)
++	      printf (_("   Index:      Address          Reloc             Sym. Name + Addend/Value\n"));
++		      /* |---9---| |------16------| |---------22---------| |...........  */
++	    else
++	      printf (_(" Index:    Address       Reloc         Sym. Name + Addend/Value\n"));
++		      /* |--7--| |----12----| |------17-------| |...........  */
++
++	    addr = section->sh_addr;
++	    got = (struct got64 *) data;
++	    for (j = 0; j < entries; j++)
++	      {
++		g = BYTE_GET (got[j].bytes);
++		if (do_wide)
++		  printf ("%8" PRIu64 ": %16.16" PRIx64, j, addr);
++		else
++		  printf ("%6" PRIu64 ": %12.12" PRIx64, j, addr);
++		display_elf_relocation_at (addr, g);
++		putchar ('\n');
++		addr += entsz;
++	      }
++	  }
++
++	free (data);
++      }
++
++ out:
++  for (size_t j = 0; j < all_relocations_count; j++)
++    free (all_relocations_root[j].r_symbol);
++  free (all_relocations_root);
++  all_relocations_root = NULL;
++  all_relocations = NULL;
++  all_relocations_count = 0;
++  return res;
++}
++
+ static void
+ process_mips_fpe_exception (int mask)
+ {
+@@ -23819,6 +24380,9 @@ process_object (Filedata * filedata)
+   if (! process_section_contents (filedata))
+     res = false;
+ 
++  if (! process_got_section_contents (filedata))
++    res = false;
++
+   if (have_separate_files)
+     {
+       separate_info * d;
+diff --git a/ld/testsuite/ld-i386/binutils.exp b/ld/testsuite/ld-i386/binutils.exp
+new file mode 100644
+index 00000000000..eb8c14215c3
+--- /dev/null
++++ b/ld/testsuite/ld-i386/binutils.exp
+@@ -0,0 +1,45 @@
++# Expect script for ELF/i386 binutils tests on linker outputs.
++#   Copyright (C) 2025 Free Software Foundation, Inc.
++#
++# This file is part of the GNU Binutils.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
++# MA 02110-1301, USA.
++#
++
++if ![is_elf_format] {
++    return
++}
++
++if { ![istarget "i?86-*-*"] && ![istarget "x86_64-*-*"] } {
++    return
++}
++
++run_ld_link_tests [list \
++    [list \
++	"Build libgot-1.so" \
++	"-shared -melf_i386 --no-ld-generated-unwind-info \
++	 -z noseparate-code -z max-page-size=0x200000 --hash-style=sysv \
++	 $NO_DT_RELR_LDFLAGS" \
++	"" \
++	"--32 -mx86-used-note=no --generate-missing-build-notes=no" \
++	{got-1.s} \
++	{{readelf -rW libgot-1a.rd} \
++	 {readelf -aW libgot-1b.rd} \
++	 {readelf -G libgot-1c.rd} \
++	 {readelf -GW libgot-1d.rd}} \
++	"libgot-1.so" \
++    ] \
++]
+diff --git a/ld/testsuite/ld-i386/got-1.s b/ld/testsuite/ld-i386/got-1.s
+new file mode 100644
+index 00000000000..30e45f9be43
+--- /dev/null
++++ b/ld/testsuite/ld-i386/got-1.s
+@@ -0,0 +1,7 @@
++	.text
++	.globl	func
++	.type	func, @function
++func:
++	call	*foo@GOT(%ebx)
++	jmp	bar@PLT
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/ld/testsuite/ld-i386/libgot-1a.rd b/ld/testsuite/ld-i386/libgot-1a.rd
+new file mode 100644
+index 00000000000..b8609b8fbe2
+--- /dev/null
++++ b/ld/testsuite/ld-i386/libgot-1a.rd
+@@ -0,0 +1,9 @@
++
++Relocation section '.rel.dyn' at offset 0x128 contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name
++0+2001fc  00000206 R_386_GLOB_DAT         00000000   foo
++
++Relocation section '.rel.plt' at offset 0x130 contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name
++0+20020c  00000307 R_386_JUMP_SLOT        00000000   bar
++#pass
+diff --git a/ld/testsuite/ld-i386/libgot-1b.rd b/ld/testsuite/ld-i386/libgot-1b.rd
+new file mode 100644
+index 00000000000..070fa424d4d
+--- /dev/null
++++ b/ld/testsuite/ld-i386/libgot-1b.rd
+@@ -0,0 +1,119 @@
++ELF Header:
++  Magic:   7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00 
++  Class:                             ELF32
++  Data:                              2's complement, little endian
++  Version:                           1 \(current\)
++  OS/ABI:                            UNIX - System V
++  ABI Version:                       0
++  Type:                              DYN \(Shared object file\)
++  Machine:                           Intel 80386
++  Version:                           0x1
++  Entry point address:               0x0
++  Start of program headers:          52 \(bytes into file\)
++  Start of section headers:          768 \(bytes into file\)
++  Flags:                             0x0
++  Size of this header:               52 \(bytes\)
++  Size of program headers:           32 \(bytes\)
++  Number of program headers:         4
++  Size of section headers:           40 \(bytes\)
++  Number of section headers:         14
++  Section header string table index: 13
++
++Section Headers:
++  \[Nr\] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
++  \[ 0\]                   NULL            00000000 000000 000000 00      0   0  0
++  \[ 1\] .hash             HASH            000000b4 0000b4 000024 04   A  2   0  4
++  \[ 2\] .dynsym           DYNSYM          000000d8 0000d8 000040 10   A  3   1  4
++  \[ 3\] .dynstr           STRTAB          00000118 000118 00000e 00   A  0   0  1
++  \[ 4\] .rel.dyn          REL             00000128 000128 000008 08   A  2   0  4
++  \[ 5\] .rel.plt          REL             00000130 000130 000008 08  AI  2  10  4
++  \[ 6\] .plt              PROGBITS        00000140 000140 000020 04  AX  0   0 16
++  \[ 7\] .text             PROGBITS        00000160 000160 00000b 00  AX  0   0  1
++  \[ 8\] .dynamic          DYNAMIC         0020016c 00016c 000090 08  WA  3   0  4
++  \[ 9\] .got              PROGBITS        002001fc 0001fc 000004 04  WA  0   0  4
++  \[10\] .got.plt          PROGBITS        00200200 000200 000010 04  WA  0   0  4
++  \[11\] .symtab           SYMTAB          00000000 000210 000060 10     12   3  4
++  \[12\] .strtab           STRTAB          00000000 000270 00002d 00      0   0  1
++  \[13\] .shstrtab         STRTAB          00000000 00029d 000060 00      0   0  1
++Key to Flags:
++  W \(write\), A \(alloc\), X \(execute\), M \(merge\), S \(strings\), I \(info\),
++  L \(link order\), O \(extra OS processing required\), G \(group\), T \(TLS\),
++  C \(compressed\), x \(unknown\), o \(OS specific\), E \(exclude\),
++  D \(mbind\), p \(processor specific\)
++
++There are no section groups in this file.
++
++Program Headers:
++  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
++  LOAD           0x000000 0x00000000 0x00000000 0x0016b 0x0016b R E 0x200000
++  LOAD           0x00016c 0x0020016c 0x0020016c 0x000a4 0x000a4 RW  0x200000
++  DYNAMIC        0x00016c 0x0020016c 0x0020016c 0x00090 0x00090 RW  0x4
++  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x10
++
++ Section to Segment mapping:
++  Segment Sections...
++   00     .hash .dynsym .dynstr .rel.dyn .rel.plt .plt .text 
++   01     .dynamic .got .got.plt 
++   02     .dynamic 
++   03     
++
++Dynamic section at offset 0x16c contains 13 entries:
++  Tag        Type                         Name/Value
++ 0x00000004 \(HASH\)                       0xb4
++ 0x00000005 \(STRTAB\)                     0x118
++ 0x00000006 \(SYMTAB\)                     0xd8
++ 0x0000000a \(STRSZ\)                      14 \(bytes\)
++ 0x0000000b \(SYMENT\)                     16 \(bytes\)
++ 0x00000003 \(PLTGOT\)                     0x200200
++ 0x00000002 \(PLTRELSZ\)                   8 \(bytes\)
++ 0x00000014 \(PLTREL\)                     REL
++ 0x00000017 \(JMPREL\)                     0x130
++ 0x00000011 \(REL\)                        0x128
++ 0x00000012 \(RELSZ\)                      8 \(bytes\)
++ 0x00000013 \(RELENT\)                     8 \(bytes\)
++ 0x00000000 \(NULL\)                       0x0
++
++Relocation section '.rel.dyn' at offset 0x128 contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name
++0+2001fc  00000206 R_386_GLOB_DAT         00000000   foo
++
++Relocation section '.rel.plt' at offset 0x130 contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name
++0+20020c  00000307 R_386_JUMP_SLOT        00000000   bar
++No processor specific unwind information to decode
++
++Symbol table '.dynsym' contains 4 entries:
++   Num:    Value  Size Type    Bind   Vis      Ndx Name
++ +[a-f0-9]+: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND 
++ +[a-f0-9]+: 00000160     0 FUNC    GLOBAL DEFAULT    7 func
++ +[a-f0-9]+: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND foo
++ +[a-f0-9]+: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND bar
++
++Symbol table '.symtab' contains 6 entries:
++   Num:    Value  Size Type    Bind   Vis      Ndx Name
++ +[a-f0-9]+: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND 
++ +[a-f0-9]+: 0020016c     0 OBJECT  LOCAL  DEFAULT    8 _DYNAMIC
++ +[a-f0-9]+: 00200200     0 OBJECT  LOCAL  DEFAULT   10 _GLOBAL_OFFSET_TABLE_
++ +[a-f0-9]+: 00000160     0 FUNC    GLOBAL DEFAULT    7 func
++ +[a-f0-9]+: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND foo
++ +[a-f0-9]+: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND bar
++
++Histogram for bucket list length \(total of 3 buckets\):
++ Length  Number     % of total  Coverage
++      0  1          \( 33.3%\)
++      1  1          \( 33.3%\)     33.3%
++      2  1          \( 33.3%\)    100.0%
++
++No version information found in this file.
++
++Global Offset Table '.got' contains 1 entry:
++   Index:  Address      Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 002001fc R_386_GLOB_DAT         foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++   Index:  Address      Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200200                        20016c
++ +[a-f0-9]+: 00200204                        0
++ +[a-f0-9]+: 00200208                        0
++ +[a-f0-9]+: 0020020c R_386_JUMP_SLOT        bar \+ 156
++#pass
+diff --git a/ld/testsuite/ld-i386/libgot-1c.rd b/ld/testsuite/ld-i386/libgot-1c.rd
+new file mode 100644
+index 00000000000..a69279ab8cc
+--- /dev/null
++++ b/ld/testsuite/ld-i386/libgot-1c.rd
+@@ -0,0 +1,12 @@
++
++Global Offset Table '.got' contains 1 entry:
++ Index:  Address      Reloc        Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 002001fc R_386_GLOB_DAT    foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++ Index:  Address      Reloc        Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200200                   20016c
++ +[a-f0-9]+: 00200204                   0
++ +[a-f0-9]+: 00200208                   0
++ +[a-f0-9]+: 0020020c R_386_JUMP_SLOT   bar \+ 156
++#pass
+diff --git a/ld/testsuite/ld-i386/libgot-1d.rd b/ld/testsuite/ld-i386/libgot-1d.rd
+new file mode 100644
+index 00000000000..af5e3df0153
+--- /dev/null
++++ b/ld/testsuite/ld-i386/libgot-1d.rd
+@@ -0,0 +1,12 @@
++
++Global Offset Table '.got' contains 1 entry:
++   Index:  Address      Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 002001fc R_386_GLOB_DAT         foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++   Index:  Address      Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200200                        20016c
++ +[a-f0-9]+: 00200204                        0
++ +[a-f0-9]+: 00200208                        0
++ +[a-f0-9]+: 0020020c R_386_JUMP_SLOT        bar \+ 156
++#pass
+diff --git a/ld/testsuite/ld-x86-64/binutils.exp b/ld/testsuite/ld-x86-64/binutils.exp
+new file mode 100644
+index 00000000000..70609a8da12
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/binutils.exp
+@@ -0,0 +1,59 @@
++# Expect script for ELF/x86-64 binutils tests on linker outputs.
++#   Copyright (C) 2025 Free Software Foundation, Inc.
++#
++# This file is part of the GNU Binutils.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
++# MA 02110-1301, USA.
++#
++
++if ![is_elf_format] {
++    return
++}
++
++if { ![istarget "x86_64-*-*"] } {
++    return
++}
++
++run_ld_link_tests [list \
++    [list \
++	"Build libgot-1.so" \
++	"-shared -melf_x86_64 --no-ld-generated-unwind-info \
++	 -z noseparate-code -z max-page-size=0x200000 --hash-style=sysv \
++	 -z nomark-plt $NO_DT_RELR_LDFLAGS" \
++	"" \
++	"--64 -mx86-used-note=no --generate-missing-build-notes=no" \
++	{got-1.s} \
++	{{readelf -rW libgot-1a.rd} \
++	 {readelf -aW libgot-1b.rd} \
++	 {readelf -G libgot-1c.rd} \
++	 {readelf -GW libgot-1d.rd}} \
++	"libgot-1.so" \
++    ] \
++    [list \
++	"Build libgot-1-x32.so" \
++	"-shared -melf32_x86_64 --no-ld-generated-unwind-info \
++	 -z noseparate-code -z max-page-size=0x200000 --hash-style=sysv \
++	 -z nomark-plt $NO_DT_RELR_LDFLAGS" \
++	"" \
++	"--x32 -mx86-used-note=no --generate-missing-build-notes=no" \
++	{got-1.s} \
++	{{readelf -rW libgot-1a-x32.rd} \
++	 {readelf -aW libgot-1b-x32.rd} \
++	 {readelf -G libgot-1c-x32.rd} \
++	 {readelf -GW libgot-1d-x32.rd}} \
++	"libgot-1-x32.so" \
++    ] \
++]
+diff --git a/ld/testsuite/ld-x86-64/got-1.s b/ld/testsuite/ld-x86-64/got-1.s
+new file mode 100644
+index 00000000000..76370691f1d
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/got-1.s
+@@ -0,0 +1,7 @@
++	.text
++	.globl	func
++	.type	func, @function
++func:
++	call	*foo@GOTPCREL(%rip)
++	jmp	bar@PLT
++	.section	.note.GNU-stack,"",@progbits
+diff --git a/ld/testsuite/ld-x86-64/libgot-1a-x32.rd b/ld/testsuite/ld-x86-64/libgot-1a-x32.rd
+new file mode 100644
+index 00000000000..6861d6588d6
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/libgot-1a-x32.rd
+@@ -0,0 +1,9 @@
++
++Relocation section '.rela.dyn' at offset 0x128 contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name \+ Addend
++0+200200  00000206 R_X86_64_GLOB_DAT      00000000   foo \+ 0
++
++Relocation section '.rela.plt' at offset 0x134 contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name \+ Addend
++0+200220  00000307 R_X86_64_JUMP_SLOT     00000000   bar \+ 0
++#pass
+diff --git a/ld/testsuite/ld-x86-64/libgot-1a.rd b/ld/testsuite/ld-x86-64/libgot-1a.rd
+new file mode 100644
+index 00000000000..8ed447003c7
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/libgot-1a.rd
+@@ -0,0 +1,9 @@
++
++Relocation section '.rela.dyn' at offset 0x1b8 contains 1 entry:
++    Offset             Info             Type               Symbol's Value  Symbol's Name \+ Addend
++0+200340  0000000200000006 R_X86_64_GLOB_DAT      0000000000000000 foo \+ 0
++
++Relocation section '.rela.plt' at offset 0x1d0 contains 1 entry:
++    Offset             Info             Type               Symbol's Value  Symbol's Name \+ Addend
++0+200360  0000000300000007 R_X86_64_JUMP_SLOT     0000000000000000 bar \+ 0
++#pass
+diff --git a/ld/testsuite/ld-x86-64/libgot-1b-x32.rd b/ld/testsuite/ld-x86-64/libgot-1b-x32.rd
+new file mode 100644
+index 00000000000..2245275b980
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/libgot-1b-x32.rd
+@@ -0,0 +1,119 @@
++ELF Header:
++  Magic:   7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00 
++  Class:                             ELF32
++  Data:                              2's complement, little endian
++  Version:                           1 \(current\)
++  OS/ABI:                            UNIX - System V
++  ABI Version:                       0
++  Type:                              DYN \(Shared object file\)
++  Machine:                           Advanced Micro Devices X86-64
++  Version:                           0x1
++  Entry point address:               0x0
++  Start of program headers:          52 \(bytes into file\)
++  Start of section headers:          792 \(bytes into file\)
++  Flags:                             0x0
++  Size of this header:               52 \(bytes\)
++  Size of program headers:           32 \(bytes\)
++  Number of program headers:         4
++  Size of section headers:           40 \(bytes\)
++  Number of section headers:         14
++  Section header string table index: 13
++
++Section Headers:
++  \[Nr\] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
++  \[ 0\]                   NULL            00000000 000000 000000 00      0   0  0
++  \[ 1\] .hash             HASH            000000b4 0000b4 000024 04   A  2   0  4
++  \[ 2\] .dynsym           DYNSYM          000000d8 0000d8 000040 10   A  3   1  4
++  \[ 3\] .dynstr           STRTAB          00000118 000118 00000e 00   A  0   0  1
++  \[ 4\] .rela.dyn         RELA            00000128 000128 00000c 0c   A  2   0  4
++  \[ 5\] .rela.plt         RELA            00000134 000134 00000c 0c  AI  2  10  4
++  \[ 6\] .plt              PROGBITS        00000140 000140 000020 10  AX  0   0 16
++  \[ 7\] .text             PROGBITS        00000160 000160 00000b 00  AX  0   0  1
++  \[ 8\] .dynamic          DYNAMIC         0020016c 00016c 000090 08  WA  3   0  4
++  \[ 9\] .got              PROGBITS        00200200 000200 000008 08  WA  0   0  8
++  \[10\] .got.plt          PROGBITS        00200208 000208 000020 08  WA  0   0  8
++  \[11\] .symtab           SYMTAB          00000000 000228 000060 10     12   3  4
++  \[12\] .strtab           STRTAB          00000000 000288 00002d 00      0   0  1
++  \[13\] .shstrtab         STRTAB          00000000 0002b5 000062 00      0   0  1
++Key to Flags:
++  W \(write\), A \(alloc\), X \(execute\), M \(merge\), S \(strings\), I \(info\),
++  L \(link order\), O \(extra OS processing required\), G \(group\), T \(TLS\),
++  C \(compressed\), x \(unknown\), o \(OS specific\), E \(exclude\),
++  D \(mbind\), l \(large\), p \(processor specific\)
++
++There are no section groups in this file.
++
++Program Headers:
++  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
++  LOAD           0x000000 0x00000000 0x00000000 0x0016b 0x0016b R E 0x200000
++  LOAD           0x00016c 0x0020016c 0x0020016c 0x000bc 0x000bc RW  0x200000
++  DYNAMIC        0x00016c 0x0020016c 0x0020016c 0x00090 0x00090 RW  0x4
++  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x10
++
++ Section to Segment mapping:
++  Segment Sections...
++   00     .hash .dynsym .dynstr .rela.dyn .rela.plt .plt .text 
++   01     .dynamic .got .got.plt 
++   02     .dynamic 
++   03     
++
++Dynamic section at offset 0x16c contains 13 entries:
++  Tag        Type                         Name/Value
++ 0x00000004 \(HASH\)                       0xb4
++ 0x00000005 \(STRTAB\)                     0x118
++ 0x00000006 \(SYMTAB\)                     0xd8
++ 0x0000000a \(STRSZ\)                      14 \(bytes\)
++ 0x0000000b \(SYMENT\)                     16 \(bytes\)
++ 0x00000003 \(PLTGOT\)                     0x200208
++ 0x00000002 \(PLTRELSZ\)                   12 \(bytes\)
++ 0x00000014 \(PLTREL\)                     RELA
++ 0x00000017 \(JMPREL\)                     0x134
++ 0x00000007 \(RELA\)                       0x128
++ 0x00000008 \(RELASZ\)                     12 \(bytes\)
++ 0x00000009 \(RELAENT\)                    12 \(bytes\)
++ 0x00000000 \(NULL\)                       0x0
++
++Relocation section '.rela.dyn' at offset 0x128 contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name \+ Addend
++0+200200  00000206 R_X86_64_GLOB_DAT      00000000   foo \+ 0
++
++Relocation section '.rela.plt' at offset 0x134 contains 1 entry:
++ Offset     Info    Type                Sym. Value  Symbol's Name \+ Addend
++0+200220  00000307 R_X86_64_JUMP_SLOT     00000000   bar \+ 0
++No processor specific unwind information to decode
++
++Symbol table '.dynsym' contains 4 entries:
++   Num:    Value  Size Type    Bind   Vis      Ndx Name
++ +[a-f0-9]+: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND 
++ +[a-f0-9]+: 00000160     0 FUNC    GLOBAL DEFAULT    7 func
++ +[a-f0-9]+: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND foo
++ +[a-f0-9]+: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND bar
++
++Symbol table '.symtab' contains 6 entries:
++   Num:    Value  Size Type    Bind   Vis      Ndx Name
++ +[a-f0-9]+: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND 
++ +[a-f0-9]+: 0020016c     0 OBJECT  LOCAL  DEFAULT    8 _DYNAMIC
++ +[a-f0-9]+: 00200208     0 OBJECT  LOCAL  DEFAULT   10 _GLOBAL_OFFSET_TABLE_
++ +[a-f0-9]+: 00000160     0 FUNC    GLOBAL DEFAULT    7 func
++ +[a-f0-9]+: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND foo
++ +[a-f0-9]+: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND bar
++
++Histogram for bucket list length \(total of 3 buckets\):
++ Length  Number     % of total  Coverage
++      0  1          \( 33.3%\)
++      1  1          \( 33.3%\)     33.3%
++      2  1          \( 33.3%\)    100.0%
++
++No version information found in this file.
++
++Global Offset Table '.got' contains 1 entry:
++   Index:  Address      Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200200 R_X86_64_GLOB_DAT      foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++   Index:  Address      Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200208                        20016c
++ +[a-f0-9]+: 00200210                        0
++ +[a-f0-9]+: 00200218                        0
++ +[a-f0-9]+: 00200220 R_X86_64_JUMP_SLOT     bar \+ 0
++#pass
+diff --git a/ld/testsuite/ld-x86-64/libgot-1b.rd b/ld/testsuite/ld-x86-64/libgot-1b.rd
+new file mode 100644
+index 00000000000..9d5cc030f72
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/libgot-1b.rd
+@@ -0,0 +1,119 @@
++ELF Header:
++  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
++  Class:                             ELF64
++  Data:                              2's complement, little endian
++  Version:                           1 \(current\)
++  OS/ABI:                            UNIX - System V
++  ABI Version:                       0
++  Type:                              DYN \(Shared object file\)
++  Machine:                           Advanced Micro Devices X86-64
++  Version:                           0x1
++  Entry point address:               0x0
++  Start of program headers:          64 \(bytes into file\)
++  Start of section headers:          1160 \(bytes into file\)
++  Flags:                             0x0
++  Size of this header:               64 \(bytes\)
++  Size of program headers:           56 \(bytes\)
++  Number of program headers:         4
++  Size of section headers:           64 \(bytes\)
++  Number of section headers:         14
++  Section header string table index: 13
++
++Section Headers:
++  \[Nr\] Name              Type            Address          Off    Size   ES Flg Lk Inf Al
++  \[ 0\]                   NULL            0000000000000000 000000 000000 00      0   0  0
++  \[ 1\] .hash             HASH            0000000000000120 000120 000024 04   A  2   0  8
++  \[ 2\] .dynsym           DYNSYM          0000000000000148 000148 000060 18   A  3   1  8
++  \[ 3\] .dynstr           STRTAB          00000000000001a8 0001a8 00000e 00   A  0   0  1
++  \[ 4\] .rela.dyn         RELA            00000000000001b8 0001b8 000018 18   A  2   0  8
++  \[ 5\] .rela.plt         RELA            00000000000001d0 0001d0 000018 18  AI  2  10  8
++  \[ 6\] .plt              PROGBITS        00000000000001f0 0001f0 000020 10  AX  0   0 16
++  \[ 7\] .text             PROGBITS        0000000000000210 000210 00000b 00  AX  0   0  1
++  \[ 8\] .dynamic          DYNAMIC         0000000000200220 000220 000120 10  WA  3   0  8
++  \[ 9\] .got              PROGBITS        0000000000200340 000340 000008 08  WA  0   0  8
++  \[10\] .got.plt          PROGBITS        0000000000200348 000348 000020 08  WA  0   0  8
++  \[11\] .symtab           SYMTAB          0000000000000000 000368 000090 18     12   3  8
++  \[12\] .strtab           STRTAB          0000000000000000 0003f8 00002d 00      0   0  1
++  \[13\] .shstrtab         STRTAB          0000000000000000 000425 000062 00      0   0  1
++Key to Flags:
++  W \(write\), A \(alloc\), X \(execute\), M \(merge\), S \(strings\), I \(info\),
++  L \(link order\), O \(extra OS processing required\), G \(group\), T \(TLS\),
++  C \(compressed\), x \(unknown\), o \(OS specific\), E \(exclude\),
++  D \(mbind\), l \(large\), p \(processor specific\)
++
++There are no section groups in this file.
++
++Program Headers:
++  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
++  LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x00021b 0x00021b R E 0x200000
++  LOAD           0x000220 0x0000000000200220 0x0000000000200220 0x000148 0x000148 RW  0x200000
++  DYNAMIC        0x000220 0x0000000000200220 0x0000000000200220 0x000120 0x000120 RW  0x8
++  GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x10
++
++ Section to Segment mapping:
++  Segment Sections...
++   00     .hash .dynsym .dynstr .rela.dyn .rela.plt .plt .text 
++   01     .dynamic .got .got.plt 
++   02     .dynamic 
++   03     
++
++Dynamic section at offset 0x220 contains 13 entries:
++  Tag        Type                         Name/Value
++ 0x0000000000000004 \(HASH\)               0x120
++ 0x0000000000000005 \(STRTAB\)             0x1a8
++ 0x0000000000000006 \(SYMTAB\)             0x148
++ 0x000000000000000a \(STRSZ\)              14 \(bytes\)
++ 0x000000000000000b \(SYMENT\)             24 \(bytes\)
++ 0x0000000000000003 \(PLTGOT\)             0x200348
++ 0x0000000000000002 \(PLTRELSZ\)           24 \(bytes\)
++ 0x0000000000000014 \(PLTREL\)             RELA
++ 0x0000000000000017 \(JMPREL\)             0x1d0
++ 0x0000000000000007 \(RELA\)               0x1b8
++ 0x0000000000000008 \(RELASZ\)             24 \(bytes\)
++ 0x0000000000000009 \(RELAENT\)            24 \(bytes\)
++ 0x0000000000000000 \(NULL\)               0x0
++
++Relocation section '.rela.dyn' at offset 0x1b8 contains 1 entry:
++    Offset             Info             Type               Symbol's Value  Symbol's Name \+ Addend
++0+200340  0000000200000006 R_X86_64_GLOB_DAT      0000000000000000 foo \+ 0
++
++Relocation section '.rela.plt' at offset 0x1d0 contains 1 entry:
++    Offset             Info             Type               Symbol's Value  Symbol's Name \+ Addend
++0+200360  0000000300000007 R_X86_64_JUMP_SLOT     0000000000000000 bar \+ 0
++No processor specific unwind information to decode
++
++Symbol table '.dynsym' contains 4 entries:
++   Num:    Value          Size Type    Bind   Vis      Ndx Name
++ +[a-f0-9]+: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
++ +[a-f0-9]+: 0000000000000210     0 FUNC    GLOBAL DEFAULT    7 func
++ +[a-f0-9]+: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND foo
++ +[a-f0-9]+: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND bar
++
++Symbol table '.symtab' contains 6 entries:
++   Num:    Value          Size Type    Bind   Vis      Ndx Name
++ +[a-f0-9]+: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
++ +[a-f0-9]+: 0000000000200220     0 OBJECT  LOCAL  DEFAULT    8 _DYNAMIC
++ +[a-f0-9]+: 0000000000200348     0 OBJECT  LOCAL  DEFAULT   10 _GLOBAL_OFFSET_TABLE_
++ +[a-f0-9]+: 0000000000000210     0 FUNC    GLOBAL DEFAULT    7 func
++ +[a-f0-9]+: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND foo
++ +[a-f0-9]+: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND bar
++
++Histogram for bucket list length \(total of 3 buckets\):
++ Length  Number     % of total  Coverage
++      0  1          \( 33.3%\)
++      1  1          \( 33.3%\)     33.3%
++      2  1          \( 33.3%\)    100.0%
++
++No version information found in this file.
++
++Global Offset Table '.got' contains 1 entry:
++   Index:      Address          Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 0000000000200340 R_X86_64_GLOB_DAT      foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++   Index:      Address          Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 0000000000200348                        200220
++ +[a-f0-9]+: 0000000000200350                        0
++ +[a-f0-9]+: 0000000000200358                        0
++ +[a-f0-9]+: 0000000000200360 R_X86_64_JUMP_SLOT     bar \+ 0
++#pass
+diff --git a/ld/testsuite/ld-x86-64/libgot-1c-x32.rd b/ld/testsuite/ld-x86-64/libgot-1c-x32.rd
+new file mode 100644
+index 00000000000..bec8ac79e07
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/libgot-1c-x32.rd
+@@ -0,0 +1,12 @@
++
++Global Offset Table '.got' contains 1 entry:
++ Index:  Address      Reloc        Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200200 R_X86_64_GLOB_DAT foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++ Index:  Address      Reloc        Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200208                   20016c
++ +[a-f0-9]+: 00200210                   0
++ +[a-f0-9]+: 00200218                   0
++ +[a-f0-9]+: 00200220 R_X86_64_JUMP_SLO bar \+ 0
++#pass
+diff --git a/ld/testsuite/ld-x86-64/libgot-1c.rd b/ld/testsuite/ld-x86-64/libgot-1c.rd
+new file mode 100644
+index 00000000000..4944b3111c3
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/libgot-1c.rd
+@@ -0,0 +1,12 @@
++
++Global Offset Table '.got' contains 1 entry:
++ Index:    Address       Reloc         Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 000000200340 R_X86_64_GLOB_DAT foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++ Index:    Address       Reloc         Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 000000200348                   200220
++ +[a-f0-9]+: 000000200350                   0
++ +[a-f0-9]+: 000000200358                   0
++ +[a-f0-9]+: 000000200360 R_X86_64_JUMP_SLO bar \+ 0
++#pass
+diff --git a/ld/testsuite/ld-x86-64/libgot-1d-x32.rd b/ld/testsuite/ld-x86-64/libgot-1d-x32.rd
+new file mode 100644
+index 00000000000..fdad77aab84
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/libgot-1d-x32.rd
+@@ -0,0 +1,12 @@
++
++Global Offset Table '.got' contains 1 entry:
++   Index:  Address      Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200200 R_X86_64_GLOB_DAT      foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++   Index:  Address      Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 00200208                        20016c
++ +[a-f0-9]+: 00200210                        0
++ +[a-f0-9]+: 00200218                        0
++ +[a-f0-9]+: 00200220 R_X86_64_JUMP_SLOT     bar \+ 0
++#pass
+diff --git a/ld/testsuite/ld-x86-64/libgot-1d.rd b/ld/testsuite/ld-x86-64/libgot-1d.rd
+new file mode 100644
+index 00000000000..2e0a6c1e0db
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/libgot-1d.rd
+@@ -0,0 +1,12 @@
++
++Global Offset Table '.got' contains 1 entry:
++   Index:      Address          Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 0000000000200340 R_X86_64_GLOB_DAT      foo \+ 0
++
++Global Offset Table '.got.plt' contains 4 entries:
++   Index:      Address          Reloc             Sym. Name \+ Addend/Value
++ +[a-f0-9]+: 0000000000200348                        200220
++ +[a-f0-9]+: 0000000000200350                        0
++ +[a-f0-9]+: 0000000000200358                        0
++ +[a-f0-9]+: 0000000000200360 R_X86_64_JUMP_SLOT     bar \+ 0
++#pass
+
+base-commit: f5493d6c96da9faf5f16d748cf6c899f0836b12d
+-- 
+2.51.0
+
