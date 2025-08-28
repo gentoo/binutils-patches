@@ -1,13 +1,12 @@
-From 2ff87965b30795687eeaa8cb7241d2d1e0a63e16 Mon Sep 17 00:00:00 2001
-Message-ID: <2ff87965b30795687eeaa8cb7241d2d1e0a63e16.1756359099.git.sam@gentoo.org>
+From 68498caec29f2d1ae5302a5d462190f4b9d3e541 Mon Sep 17 00:00:00 2001
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Mon, 25 Aug 2025 18:00:00 -0700
-Subject: [PATCH] readelf: Add -G/--got-contents options
+Subject: [PATCH] readelf: Add --got-contents option
 
-Add -G/--got-contents options to readelf, inspired by the similar option
-on Solaris, to display contents of GOT sections:
+Add --got-contents option to readelf, inspired by the -G option on Solaris,
+to display contents of GOT sections:
 
-$ readelf -G libfoo.so
+$ readelf --got-contents libfoo.so
 
 Global Offset Table '.got' contains 1 entry:
  Index:    Address       Reloc         Sym. Name + Addend/Value
@@ -20,7 +19,7 @@ Global Offset Table '.got.plt' contains 4 entries:
      2: 000000200358                   0
      3: 000000200360 R_X86_64_JUMP_SLO bar + 0
 
-When -G/--got-contents options are used:
+When --got-content options are used:
 
 1. Allocate an array, all_relocations, to hold all relocations.
 2. Update dump_relr_relocations and dump_relocations to scan relocations
@@ -31,7 +30,7 @@ by matching the GOT entry offset against the cached relocations.
 
 binutils/
 
-	* NEWS: Mention "readelf -G/--got-contents".
+	* NEWS: Mention "readelf --got-contents".
 	* readelf.c (do_got_section_contents): New.
 	(elf_relocation): Likewise.
 	(all_relocations_root): Likewise.
@@ -42,9 +41,10 @@ binutils/
 	relocations should be displayed.  Populate all_relocations if
 	do_got_section_contents is true.
 	(dump_relocations): Likewise.
-	(options): Add -G/--got-contents.
-	(usage): Show -G/--got-contents.
-	(parse_args): Support -G/--got-contents.
+	(long_option_values): Add OPTION_GOT_CONTENTS.
+	(options): Add --got-contents.
+	(usage): Show --got-contents.
+	(parse_args): Support --got-contents.
 	(display_relocations): Add bool argument, dump_reloc, to indicate
 	if relocations should be displayed.  Call update_all_relocations.
 	Pass dump_reloc to dump_relr_relocations and dump_relocations.
@@ -55,7 +55,7 @@ binutils/
 	(display_elf_relocation_at): Likewise.
 	(process_got_section_contents): Likewise.
 	(process_object): Call process_got_section_contents.
-	* doc/binutils.texi: Document -G/--got-contents.
+	* doc/binutils.texi: Document --got-contents.
 
 ld/
 
@@ -79,8 +79,8 @@ ld/
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
  binutils/NEWS                           |   3 +
- binutils/doc/binutils.texi              |  11 +-
- binutils/readelf.c                      | 874 +++++++++++++++++++-----
+ binutils/doc/binutils.texi              |  10 +-
+ binutils/readelf.c                      | 878 +++++++++++++++++++-----
  ld/testsuite/ld-i386/binutils.exp       |  45 ++
  ld/testsuite/ld-i386/got-1.s            |   7 +
  ld/testsuite/ld-i386/libgot-1a.rd       |   9 +
@@ -97,7 +97,7 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  ld/testsuite/ld-x86-64/libgot-1c.rd     |  12 +
  ld/testsuite/ld-x86-64/libgot-1d-x32.rd |  12 +
  ld/testsuite/ld-x86-64/libgot-1d.rd     |  12 +
- 19 files changed, 1303 insertions(+), 159 deletions(-)
+ 19 files changed, 1305 insertions(+), 160 deletions(-)
  create mode 100644 ld/testsuite/ld-i386/binutils.exp
  create mode 100644 ld/testsuite/ld-i386/got-1.s
  create mode 100644 ld/testsuite/ld-i386/libgot-1a.rd
@@ -116,30 +116,30 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  create mode 100644 ld/testsuite/ld-x86-64/libgot-1d.rd
 
 diff --git a/binutils/NEWS b/binutils/NEWS
-index ccda8559897..9af862a4735 100644
+index ccda8559897..0a4ed3bcc43 100644
 --- a/binutils/NEWS
 +++ b/binutils/NEWS
 @@ -1,5 +1,8 @@
  -*- text -*-
  
-+* Add -G/--got-contents options to readelf to display the contents of
++* Add --got-contents option to readelf to display the contents of
 +  Global Offset Table (GOT) sections.
 +
  * Internal changes to plugin support, and stricter target checking may result
    in some errors being exposed in user options passed to the various binutils.
    For example objcopy --target=TARGET now will only work if the input file is
 diff --git a/binutils/doc/binutils.texi b/binutils/doc/binutils.texi
-index 4543341e00c..15f31d1bcef 100644
+index 4543341e00c..6217dd76d90 100644
 --- a/binutils/doc/binutils.texi
 +++ b/binutils/doc/binutils.texi
-@@ -5036,6 +5036,7 @@ readelf [@option{-a}|@option{--all}]
-         [@option{-h}|@option{--file-header}]
-         [@option{-l}|@option{--program-headers}|@option{--segments}]
-         [@option{-S}|@option{--section-headers}|@option{--sections}]
-+        [@option{-G}|@option{--got-contents}]
-         [@option{-g}|@option{--section-groups}]
-         [@option{-t}|@option{--section-details}]
-         [@option{-e}|@option{--headers}]
+@@ -5076,6 +5076,7 @@ readelf [@option{-a}|@option{--all}]
+         [@option{--ctf-strings=}@var{section}]
+         [@option{--sframe=}@var{section}]
+         [@option{-I}|@option{--histogram}]
++        [@option{--got-contents}]
+         [@option{-v}|@option{--version}]
+         [@option{-W}|@option{--wide}]
+         [@option{-T}|@option{--silent-truncation}]
 @@ -5111,7 +5112,8 @@ given.
  Equivalent to specifying @option{--file-header},
  @option{--program-headers}, @option{--sections}, @option{--symbols},
@@ -150,22 +150,21 @@ index 4543341e00c..15f31d1bcef 100644
  @option{--section-groups} and @option{--histogram}.
  
  Note - this option does not enable @option{--use-dynamic} itself, so
-@@ -5143,6 +5145,13 @@ Suppress "no symbols" diagnostic.
- Displays the information contained in the file's section headers, if it
- has any.
+@@ -5387,6 +5389,12 @@ string table are used.
+ If either of @option{--ctf-symbols} or @option{--ctf-strings} is specified, the
+ other must be specified as well.
  
-+@item -G
-+@itemx --got-contents
++@item --got-contents
 +@cindex ELF section information
 +@cindex ELF reloc information
 +Displays the contents of the file's Global Offset Table (GOT) sections,
 +if it has any.
 +
- @item -g
- @itemx --section-groups
- @cindex ELF section group information
+ @item -I
+ @itemx --histogram
+ Display a histogram of bucket list lengths when displaying the contents
 diff --git a/binutils/readelf.c b/binutils/readelf.c
-index 68e193415f2..efd4221ef6f 100644
+index 68e193415f2..a58ad8d116c 100644
 --- a/binutils/readelf.c
 +++ b/binutils/readelf.c
 @@ -229,6 +229,7 @@ static bool do_dyn_syms = false;
@@ -604,14 +603,14 @@ index 68e193415f2..efd4221ef6f 100644
        symtab_index = get_reloc_symindex  (inf);
  
 -      if (is_32bit_elf)
--	{
++      if (dump_reloc)
+ 	{
 -	  printf ("%8.8lx  %8.8lx ",
 -		  (unsigned long) offset & 0xffffffff,
 -		  (unsigned long) inf & 0xffffffff);
 -	}
 -      else
-+      if (dump_reloc)
- 	{
+-	{
 -	  printf (do_wide
 -		  ? "%16.16" PRIx64 "  %16.16" PRIx64 " "
 -		  : "%12.12" PRIx64 "  %12.12" PRIx64 " ",
@@ -878,47 +877,63 @@ index 68e193415f2..efd4221ef6f 100644
  	}
      }
  
-@@ -6111,6 +6417,7 @@ static struct option options[] =
-   {"use-dynamic",      no_argument, 0, 'D'},
-   {"dynamic",	       no_argument, 0, 'd'},
-   {"headers",	       no_argument, 0, 'e'},
-+  {"got-contents",     no_argument, 0, 'G'},
-   {"section-groups",   no_argument, 0, 'g'},
-   {"help",	       no_argument, 0, 'H'},
-   {"file-header",      no_argument, 0, 'h'},
-@@ -6183,6 +6490,8 @@ usage (FILE * stream)
-   fprintf (stream, _("\
-      --sections          An alias for --section-headers\n"));
-   fprintf (stream, _("\
-+  -G --got               Display GOT section contents\n"));
-+  fprintf (stream, _("\
-   -g --section-groups    Display the section groups\n"));
-   fprintf (stream, _("\
-   -t --section-details   Display the section details\n"));
-@@ -6417,7 +6726,7 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
-     usage (stderr);
+@@ -6097,7 +6403,8 @@ enum long_option_values
+   OPTION_NO_RECURSE_LIMIT,
+   OPTION_NO_DEMANGLING,
+   OPTION_NO_EXTRA_SYM_INFO,
+-  OPTION_SYM_BASE
++  OPTION_SYM_BASE,
++  OPTION_GOT_CONTENTS
+ };
  
-   while ((c = getopt_long
--	  (argc, argv, "ACDHILNPR:STU:VWXacdeghi:j:lnp:rstuvw::x:z", options, NULL)) != EOF)
-+	  (argc, argv, "ACDGHILNPR:STU:VWXacdeghi:j:lnp:rstuvw::x:z", options, NULL)) != EOF)
-     {
-       switch (c)
- 	{
-@@ -6441,8 +6750,13 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
+ static struct option options[] =
+@@ -6160,6 +6467,7 @@ static struct option options[] =
+ #endif
+   {"sframe",	       optional_argument, 0, OPTION_SFRAME_DUMP},
+   {"sym-base",	       optional_argument, 0, OPTION_SYM_BASE},
++  {"got-contents",     no_argument, 0, OPTION_GOT_CONTENTS},
+ 
+   {0,		       no_argument, 0, 0}
+ };
+@@ -6171,7 +6479,7 @@ usage (FILE * stream)
+   fprintf (stream, _(" Display information about the contents of ELF format files\n"));
+   fprintf (stream, _(" Options are:\n"));
+   fprintf (stream, _("\
+-  -a --all               Equivalent to: -h -l -S -s -r -d -V -A -I\n"));
++  -a --all               Equivalent to: -h -l -S -s -r -d -V -A -I --got-contents\n"));
+   fprintf (stream, _("\
+   -h --file-header       Display the ELF file header\n"));
+   fprintf (stream, _("\
+@@ -6317,6 +6625,8 @@ usage (FILE * stream)
+   fprintf (stream, _("\
+   -I --histogram         Display histogram of bucket list lengths\n"));
+   fprintf (stream, _("\
++  --got-contents         Display GOT section contents\n"));
++  fprintf (stream, _("\
+   -W --wide              Allow output width to exceed 80 characters\n"));
+   fprintf (stream, _("\
+   -T --silent-truncation If a symbol name is truncated, do not add [...] suffix\n"));
+@@ -6441,6 +6751,7 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
  	  do_histogram = true;
  	  do_arch = true;
  	  do_notes = true;
 +	  do_got_section_contents = true;
  	  break;
  
-+	case 'G':
+ 	case 'g':
+@@ -6700,6 +7011,11 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
+ 	    }
+ 	  break;
+ 
++	case OPTION_GOT_CONTENTS:
 +	  do_got_section_contents = true;
 +	  do_dump = true;
 +	  break;
- 	case 'g':
- 	  do_section_groups = true;
- 	  break;
-@@ -9437,7 +9751,8 @@ rel_type_from_sh_type (unsigned int sh_type)
++
+ 	default:
+ 	  /* xgettext:c-format */
+ 	  error (_("Invalid option '-%c'\n"), c);
+@@ -9437,7 +9753,8 @@ rel_type_from_sh_type (unsigned int sh_type)
  
  static bool
  display_relocations (Elf_Internal_Shdr *  section,
@@ -928,7 +943,7 @@ index 68e193415f2..efd4221ef6f 100644
  {
    relocation_type rel_type = rel_type_from_sh_type (section->sh_type);
  
-@@ -9449,19 +9764,23 @@ display_relocations (Elf_Internal_Shdr *  section,
+@@ -9449,19 +9766,23 @@ display_relocations (Elf_Internal_Shdr *  section,
    if (rel_size == 0)
      return false;
  
@@ -962,7 +977,7 @@ index 68e193415f2..efd4221ef6f 100644
  
    if (rel_type == reltype_relr)
      {
-@@ -9470,26 +9789,33 @@ display_relocations (Elf_Internal_Shdr *  section,
+@@ -9470,26 +9791,33 @@ display_relocations (Elf_Internal_Shdr *  section,
  	 the number of words in the compressed RELR format.  So also provide
  	 the number of locations affected.  */
  
@@ -1010,7 +1025,7 @@ index 68e193415f2..efd4221ef6f 100644
    Elf_Internal_Shdr * symsec;
    Elf_Internal_Sym *  symtab = NULL;
    uint64_t            nsyms = 0;
-@@ -9524,12 +9850,15 @@ display_relocations (Elf_Internal_Shdr *  section,
+@@ -9524,12 +9852,15 @@ display_relocations (Elf_Internal_Shdr *  section,
      res = dump_relr_relocations (filedata, section->sh_size,
  				 section->sh_entsize,
  				 section->sh_offset,
@@ -1028,7 +1043,7 @@ index 68e193415f2..efd4221ef6f 100644
    free (strtab);
    free (symtab);
  
-@@ -9543,14 +9872,16 @@ process_relocs (Filedata * filedata)
+@@ -9543,14 +9874,16 @@ process_relocs (Filedata * filedata)
  {
    uint64_t rel_size;
    uint64_t rel_offset;
@@ -1046,7 +1061,7 @@ index 68e193415f2..efd4221ef6f 100644
        bool  has_dynamic_reloc;
        unsigned int i;
  
-@@ -9584,16 +9915,37 @@ process_relocs (Filedata * filedata)
+@@ -9584,16 +9917,37 @@ process_relocs (Filedata * filedata)
  		}
  	    }
  
@@ -1094,7 +1109,7 @@ index 68e193415f2..efd4221ef6f 100644
  
  	  if (rel_type == reltype_relr)
  	    dump_relr_relocations (filedata,
-@@ -9603,24 +9955,37 @@ process_relocs (Filedata * filedata)
+@@ -9603,24 +9957,37 @@ process_relocs (Filedata * filedata)
  				   filedata->dynamic_symbols,
  				   filedata->num_dynamic_syms,
  				   filedata->dynamic_strings,
@@ -1143,7 +1158,7 @@ index 68e193415f2..efd4221ef6f 100644
  	{
  	  if (filedata->is_separate)
  	    printf (_("\nThere are no dynamic relocations in linked file '%s'.\n"),
-@@ -9639,11 +10004,11 @@ process_relocs (Filedata * filedata)
+@@ -9639,11 +10006,11 @@ process_relocs (Filedata * filedata)
  	   i < filedata->file_header.e_shnum;
  	   i++, section++)
  	{
@@ -1157,7 +1172,7 @@ index 68e193415f2..efd4221ef6f 100644
  	{
  	  /* Users sometimes forget the -D option, so try to be helpful.  */
  	  for (i = 0; i < ARRAY_SIZE (dynamic_relocations); i++)
-@@ -17627,7 +17992,7 @@ process_section_contents (Filedata * filedata)
+@@ -17627,7 +17994,7 @@ process_section_contents (Filedata * filedata)
  	    case SHT_RELA:
  	    case SHT_REL:
  	    case SHT_RELR:
@@ -1166,7 +1181,7 @@ index 68e193415f2..efd4221ef6f 100644
  	      break;
  
  	    case SHT_NOTE:
-@@ -17718,6 +18083,196 @@ process_section_contents (Filedata * filedata)
+@@ -17718,6 +18085,196 @@ process_section_contents (Filedata * filedata)
    return res;
  }
  
@@ -1363,7 +1378,7 @@ index 68e193415f2..efd4221ef6f 100644
  static void
  process_mips_fpe_exception (int mask)
  {
-@@ -23833,6 +24388,9 @@ process_object (Filedata * filedata)
+@@ -23833,6 +24390,9 @@ process_object (Filedata * filedata)
    if (! process_section_contents (filedata))
      res = false;
  
@@ -1375,7 +1390,7 @@ index 68e193415f2..efd4221ef6f 100644
        separate_info * d;
 diff --git a/ld/testsuite/ld-i386/binutils.exp b/ld/testsuite/ld-i386/binutils.exp
 new file mode 100644
-index 00000000000..eb8c14215c3
+index 00000000000..5069c59ca9e
 --- /dev/null
 +++ b/ld/testsuite/ld-i386/binutils.exp
 @@ -0,0 +1,45 @@
@@ -1419,8 +1434,8 @@ index 00000000000..eb8c14215c3
 +	{got-1.s} \
 +	{{readelf -rW libgot-1a.rd} \
 +	 {readelf -aW libgot-1b.rd} \
-+	 {readelf -G libgot-1c.rd} \
-+	 {readelf -GW libgot-1d.rd}} \
++	 {readelf --got-contents libgot-1c.rd} \
++	 {readelf {--got-contents -W} libgot-1d.rd}} \
 +	"libgot-1.so" \
 +    ] \
 +]
@@ -1615,7 +1630,7 @@ index 00000000000..632b47be743
 +#pass
 diff --git a/ld/testsuite/ld-x86-64/binutils.exp b/ld/testsuite/ld-x86-64/binutils.exp
 new file mode 100644
-index 00000000000..70609a8da12
+index 00000000000..fef997368db
 --- /dev/null
 +++ b/ld/testsuite/ld-x86-64/binutils.exp
 @@ -0,0 +1,59 @@
@@ -1659,8 +1674,8 @@ index 00000000000..70609a8da12
 +	{got-1.s} \
 +	{{readelf -rW libgot-1a.rd} \
 +	 {readelf -aW libgot-1b.rd} \
-+	 {readelf -G libgot-1c.rd} \
-+	 {readelf -GW libgot-1d.rd}} \
++	 {readelf --got-contents libgot-1c.rd} \
++	 {readelf {--got-contents -W} libgot-1d.rd}} \
 +	"libgot-1.so" \
 +    ] \
 +    [list \
@@ -1673,8 +1688,8 @@ index 00000000000..70609a8da12
 +	{got-1.s} \
 +	{{readelf -rW libgot-1a-x32.rd} \
 +	 {readelf -aW libgot-1b-x32.rd} \
-+	 {readelf -G libgot-1c-x32.rd} \
-+	 {readelf -GW libgot-1d-x32.rd}} \
++	 {readelf --got-contents libgot-1c-x32.rd} \
++	 {readelf {--got-contents -W} libgot-1d-x32.rd}} \
 +	"libgot-1-x32.so" \
 +    ] \
 +]
@@ -2044,5 +2059,4 @@ index 00000000000..341840e9081
 + +[0-9]+: 0000000000200360 R_X86_64_JUMP_SLOT     bar \+ 0
 +#pass
 -- 
-2.51.0
-
+GitLab
