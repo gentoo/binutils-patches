@@ -1,40 +1,86 @@
-From d10474f6defab5484fd8a9a79c3fa8588ca37396 Mon Sep 17 00:00:00 2001
-Message-ID: <d10474f6defab5484fd8a9a79c3fa8588ca37396.1756262897.git.sam@gentoo.org>
+From 2ff87965b30795687eeaa8cb7241d2d1e0a63e16 Mon Sep 17 00:00:00 2001
+Message-ID: <2ff87965b30795687eeaa8cb7241d2d1e0a63e16.1756359099.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
-Date: Tue, 26 Aug 2025 19:45:44 -0700
+Date: Mon, 25 Aug 2025 18:00:00 -0700
 Subject: [PATCH] readelf: Add -G/--got-contents options
 
-On Tue, Aug 26, 2025 at 02:53:40PM -0700, H.J. Lu wrote:
-> Add -G/--got-contents options to readelf, inspired by the similar option
-> on Solaris, to display the contents of GOT sections:
->
-> $ readelf -G libfoo.so
->
-> Global Offset Table '.got' contains 5 entries:
->  Index:    Address       Reloc         Sym. Name + Addend/Value
->      0: 000000002fc8 R_X86_64_GLOB_DAT bar + 0
->      1: 000000002fd0 R_X86_64_GLOB_DAT __gmon_start__ + 0
->      2: 000000002fd8 R_X86_64_GLOB_DAT _ITM_registerTMCloneTable + 0
->      3: 000000002fe0 R_X86_64_GLOB_DAT __cxa_finalize@GLIBC_2.2.5 + 0
->      4: 000000002fe8                   0
->
-> Global Offset Table '.got.plt' contains 4 entries:
->  Index:    Address       Reloc         Sym. Name + Addend/Value
->      0: 000000002ff0                   2dd0
->      1: 000000002ff8                   0
->      2: 000000003000 R_X86_64_JUMP_SLO printf@GLIBC_2.2.5 + 2c0
->      3: 000000003008                   0
->
-> Any comments?
->
+Add -G/--got-contents options to readelf, inspired by the similar option
+on Solaris, to display contents of GOT sections:
 
-The updated patch with typo fix.
+$ readelf -G libfoo.so
 
-H.J.
+Global Offset Table '.got' contains 1 entry:
+ Index:    Address       Reloc         Sym. Name + Addend/Value
+     0: 000000200340 R_X86_64_GLOB_DAT foo + 0
+
+Global Offset Table '.got.plt' contains 4 entries:
+ Index:    Address       Reloc         Sym. Name + Addend/Value
+     0: 000000200348                   200220
+     1: 000000200350                   0
+     2: 000000200358                   0
+     3: 000000200360 R_X86_64_JUMP_SLO bar + 0
+
+When -G/--got-contents options are used:
+
+1. Allocate an array, all_relocations, to hold all relocations.
+2. Update dump_relr_relocations and dump_relocations to scan relocations
+and cache them in all_relocations.  Don't display relocations if not
+requested.
+3. Add process_got_section_contents to display contents of GOT sections
+by matching the GOT entry offset against the cached relocations.
+
+binutils/
+
+	* NEWS: Mention "readelf -G/--got-contents".
+	* readelf.c (do_got_section_contents): New.
+	(elf_relocation): Likewise.
+	(all_relocations_root): Likewise.
+	(all_relocations): Likewise.
+	(all_relocations_count): Likewise.
+	(update_all_relocations): Likewise.
+	(dump_relr_relocations): Add a bool argument to indicate if
+	relocations should be displayed.  Populate all_relocations if
+	do_got_section_contents is true.
+	(dump_relocations): Likewise.
+	(options): Add -G/--got-contents.
+	(usage): Show -G/--got-contents.
+	(parse_args): Support -G/--got-contents.
+	(display_relocations): Add bool argument, dump_reloc, to indicate
+	if relocations should be displayed.  Call update_all_relocations.
+	Pass dump_reloc to dump_relr_relocations and dump_relocations.
+	(process_relocs): Check do_got_section_contents.  Handle
+	do_got_section_contents for dynamic relocations.
+	(process_section_contents): Pass true to display_relocations.
+	(elf_relocation_cmp): New.
+	(display_elf_relocation_at): Likewise.
+	(process_got_section_contents): Likewise.
+	(process_object): Call process_got_section_contents.
+	* doc/binutils.texi: Document -G/--got-contents.
+
+ld/
+
+	* testsuite/ld-i386/binutils.exp: New file.
+	* testsuite/ld-i386/got-1.s: Likewise.
+	* testsuite/ld-i386/libgot-1a.rd: Likewise.
+	* testsuite/ld-i386/libgot-1b.rd: Likewise.
+	* testsuite/ld-i386/libgot-1c.rd: Likewise.
+	* testsuite/ld-i386/libgot-1d.rd: Likewise.
+	* testsuite/ld-x86-64/binutils.exp: Likewise.
+	* testsuite/ld-x86-64/got-1.s: Likewise.
+	* testsuite/ld-x86-64/libgot-1a-x32.rd: Likewise.
+	* testsuite/ld-x86-64/libgot-1a.rd: Likewise.
+	* testsuite/ld-x86-64/libgot-1b-x32.rd: Likewise.
+	* testsuite/ld-x86-64/libgot-1b.rd: Likewise.
+	* testsuite/ld-x86-64/libgot-1c-x32.rd: Likewise.
+	* testsuite/ld-x86-64/libgot-1c.rd: Likewise.
+	* testsuite/ld-x86-64/libgot-1d-x32.rd: Likewise.
+	* testsuite/ld-x86-64/libgot-1d.rd: Likewise.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
  binutils/NEWS                           |   3 +
  binutils/doc/binutils.texi              |  11 +-
- binutils/readelf.c                      | 896 +++++++++++++++++++-----
+ binutils/readelf.c                      | 874 +++++++++++++++++++-----
  ld/testsuite/ld-i386/binutils.exp       |  45 ++
  ld/testsuite/ld-i386/got-1.s            |   7 +
  ld/testsuite/ld-i386/libgot-1a.rd       |   9 +
@@ -51,7 +97,7 @@ H.J.
  ld/testsuite/ld-x86-64/libgot-1c.rd     |  12 +
  ld/testsuite/ld-x86-64/libgot-1d-x32.rd |  12 +
  ld/testsuite/ld-x86-64/libgot-1d.rd     |  12 +
- 19 files changed, 1317 insertions(+), 167 deletions(-)
+ 19 files changed, 1303 insertions(+), 159 deletions(-)
  create mode 100644 ld/testsuite/ld-i386/binutils.exp
  create mode 100644 ld/testsuite/ld-i386/got-1.s
  create mode 100644 ld/testsuite/ld-i386/libgot-1a.rd
@@ -119,7 +165,7 @@ index 4543341e00c..15f31d1bcef 100644
  @itemx --section-groups
  @cindex ELF section group information
 diff --git a/binutils/readelf.c b/binutils/readelf.c
-index bb81c824ac3..15064daa969 100644
+index 68e193415f2..efd4221ef6f 100644
 --- a/binutils/readelf.c
 +++ b/binutils/readelf.c
 @@ -229,6 +229,7 @@ static bool do_dyn_syms = false;
@@ -185,7 +231,17 @@ index bb81c824ac3..15064daa969 100644
  static uint64_t
  count_relr_relocations (Filedata *          filedata,
  			Elf_Internal_Shdr * section)
-@@ -1836,7 +1878,8 @@ dump_relr_relocations (Filedata *          filedata,
+@@ -1830,6 +1872,9 @@ count_relr_relocations (Filedata *          filedata,
+   return count;
+ }
+ 
++/* If DUMP_RELOC is false, don't display RELR relocations, just collect
++   RELR relocations for displaying GOT section contents later.  */
++
+ static bool
+ dump_relr_relocations (Filedata *          filedata,
+ 		       uint64_t            relr_size,
+@@ -1838,7 +1883,8 @@ dump_relr_relocations (Filedata *          filedata,
  		       Elf_Internal_Sym *  symtab,
  		       uint64_t            nsyms,
  		       char *              strtab,
@@ -195,7 +251,7 @@ index bb81c824ac3..15064daa969 100644
  {
    uint64_t *  relrs;
    uint64_t    nentries, i;
-@@ -1861,7 +1904,8 @@ dump_relr_relocations (Filedata *          filedata,
+@@ -1860,7 +1906,8 @@ dump_relr_relocations (Filedata *          filedata,
      num_bits_in_entry = 63;
    else
      {
@@ -205,7 +261,7 @@ index bb81c824ac3..15064daa969 100644
        return false;
      }
  
-@@ -1875,6 +1919,161 @@ dump_relr_relocations (Filedata *          filedata,
+@@ -1874,6 +1921,161 @@ dump_relr_relocations (Filedata *          filedata,
    if (symtab == NULL)
      nsyms = 0;
  
@@ -214,7 +270,7 @@ index bb81c824ac3..15064daa969 100644
 +    switch (filedata->file_header.e_machine)
 +      {
 +      default:
-+	break;
++	abort ();
 +
 +      case EM_386:
 +      case EM_IAMCU:
@@ -367,7 +423,7 @@ index bb81c824ac3..15064daa969 100644
    if (symtab != NULL)
      {
        /* Symbol tables are not sorted on address, but we want a quick lookup
-@@ -1885,11 +2084,15 @@ dump_relr_relocations (Filedata *          filedata,
+@@ -1884,11 +2086,15 @@ dump_relr_relocations (Filedata *          filedata,
        nsyms = filter_display_syms (filedata, symtab, nsyms, strtab, strtablen);
      }
  
@@ -387,7 +443,7 @@ index bb81c824ac3..15064daa969 100644
    for (i = 0; i < nentries; i++)
      {
        uint64_t entry;
-@@ -1899,16 +2102,34 @@ dump_relr_relocations (Filedata *          filedata,
+@@ -1898,16 +2104,34 @@ dump_relr_relocations (Filedata *          filedata,
        else
  	entry = BYTE_GET (((Elf64_External_Relr *)relrs)[i].r_data);
  
@@ -428,7 +484,7 @@ index bb81c824ac3..15064daa969 100644
  	  where += relr_entsize;
  	}
        else
-@@ -1921,7 +2142,7 @@ dump_relr_relocations (Filedata *          filedata,
+@@ -1920,7 +2144,7 @@ dump_relr_relocations (Filedata *          filedata,
  	    /* This can actually happen when the linker is allowed to shrink
  	       RELR sections.  For more details see: https://reviews.llvm.org/D67164. */
  	    continue;
@@ -437,7 +493,7 @@ index bb81c824ac3..15064daa969 100644
  	    warn (_("Unusual RELR bitmap - no previous entry to set the base address\n"));
  
  	  for (j = 0; entry >>= 1; j++)
-@@ -1929,19 +2150,35 @@ dump_relr_relocations (Filedata *          filedata,
+@@ -1928,19 +2152,35 @@ dump_relr_relocations (Filedata *          filedata,
  	      {
  		uint64_t addr = where + (j * relr_entsize);
  
@@ -480,7 +536,17 @@ index bb81c824ac3..15064daa969 100644
  	  where += num_bits_in_entry * relr_entsize;
  	}
      }
-@@ -1962,7 +2199,8 @@ dump_relocations (Filedata *          filedata,
+@@ -1950,7 +2190,8 @@ dump_relr_relocations (Filedata *          filedata,
+ }
+ 
+ /* Display the contents of the relocation data found at the specified
+-   offset.  */
++   offset.  If DUMP_RELOC is false, don't display relocations, just
++   collect relocations for displaying GOT section contents later.  */
+ 
+ static bool
+ dump_relocations (Filedata *          filedata,
+@@ -1961,7 +2202,8 @@ dump_relocations (Filedata *          filedata,
  		  char *              strtab,
  		  uint64_t            strtablen,
  		  relocation_type     rel_type,
@@ -490,7 +556,7 @@ index bb81c824ac3..15064daa969 100644
  {
    size_t i;
    Elf_Internal_Rela * rels;
-@@ -1987,38 +2225,41 @@ dump_relocations (Filedata *          filedata,
+@@ -1986,26 +2228,26 @@ dump_relocations (Filedata *          filedata,
        return false;
      }
  
@@ -505,20 +571,10 @@ index bb81c824ac3..15064daa969 100644
 -	    printf (_(" Offset     Info    Type            Sym.Value  Sym. Name + Addend\n"));
 -	}
 -      else
--	{
--	  if (do_wide)
--	    printf (_(" Offset     Info    Type                Sym. Value  Symbol's Name\n"));
--	  else
--	    printf (_(" Offset     Info    Type            Sym.Value  Sym. Name\n"));
--	}
--    }
--  else
--    {
--      if (rel_type == reltype_rela)
 +      if (is_32bit_elf)
  	{
 -	  if (do_wide)
--	    printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend\n"));
+-	    printf (_(" Offset     Info    Type                Sym. Value  Symbol's Name\n"));
 +	  if (rel_type == reltype_rela)
 +	    {
 +	      if (do_wide)
@@ -527,7 +583,7 @@ index bb81c824ac3..15064daa969 100644
 +		printf (_(" Offset     Info    Type            Sym.Value  Sym. Name + Addend\n"));
 +	    }
  	  else
--	    printf (_("  Offset          Info           Type           Sym. Value    Sym. Name + Addend\n"));
+-	    printf (_(" Offset     Info    Type            Sym.Value  Sym. Name\n"));
 +	    {
 +	      if (do_wide)
 +		printf (_(" Offset     Info    Type                Sym. Value  Symbol's Name\n"));
@@ -535,29 +591,15 @@ index bb81c824ac3..15064daa969 100644
 +		printf (_(" Offset     Info    Type            Sym.Value  Sym. Name\n"));
 +	    }
  	}
-       else
+-    }
+-  else
+-    {
+-      if (rel_type == reltype_rela)
++      else if (rel_type == reltype_rela)
  	{
--	  if (do_wide)
--	    printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name\n"));
-+	  if (rel_type == reltype_rela)
-+	    {
-+	      if (do_wide)
-+		printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend\n"));
-+	      else
-+		printf (_("  Offset          Info           Type           Sym. Value    Sym. Name + Addend\n"));
-+	    }
- 	  else
--	    printf (_("  Offset          Info           Type           Sym. Value    Sym. Name\n"));
-+	    {
-+	      if (do_wide)
-+		printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name\n"));
-+	      else
-+		printf (_("  Offset          Info           Type           Sym. Value    Sym. Name\n"));
-+	    }
- 	}
-     }
- 
-@@ -2036,18 +2277,17 @@ dump_relocations (Filedata *          filedata,
+ 	  if (do_wide)
+ 	    printf (_("    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend\n"));
+@@ -2035,18 +2277,16 @@ dump_relocations (Filedata *          filedata,
        type = get_reloc_type (filedata, inf);
        symtab_index = get_reloc_symindex  (inf);
  
@@ -575,9 +617,8 @@ index bb81c824ac3..15064daa969 100644
 -		  : "%12.12" PRIx64 "  %12.12" PRIx64 " ",
 -		  offset, inf);
 +	  if (is_32bit_elf)
-+	    printf ("%8.8lx  %8.8lx ",
-+		    (unsigned long) offset & 0xffffffff,
-+		    (unsigned long) inf & 0xffffffff);
++	    printf ("%8.8" PRIx32 "  %8.8" PRIx32 " ",
++		    (uint32_t) offset, (uint32_t) inf);
 +	  else
 +	    printf (do_wide
 +		    ? "%16.16" PRIx64 "  %16.16" PRIx64 " "
@@ -586,7 +627,7 @@ index bb81c824ac3..15064daa969 100644
  	}
  
        switch (filedata->file_header.e_machine)
-@@ -2397,10 +2637,15 @@ dump_relocations (Filedata *          filedata,
+@@ -2396,10 +2636,15 @@ dump_relocations (Filedata *          filedata,
  	  break;
  	}
  
@@ -606,7 +647,7 @@ index bb81c824ac3..15064daa969 100644
  
        if (filedata->file_header.e_machine == EM_ALPHA
  	  && rtype != NULL
-@@ -2419,23 +2664,29 @@ dump_relocations (Filedata *          filedata,
+@@ -2418,23 +2663,29 @@ dump_relocations (Filedata *          filedata,
  	    default: rtype = NULL;
  	    }
  
@@ -646,7 +687,7 @@ index bb81c824ac3..15064daa969 100644
  	    }
  	  else
  	    {
-@@ -2454,7 +2705,8 @@ dump_relocations (Filedata *          filedata,
+@@ -2453,7 +2704,8 @@ dump_relocations (Filedata *          filedata,
  					     &sym_info,
  					     &vna_other);
  
@@ -656,7 +697,7 @@ index bb81c824ac3..15064daa969 100644
  
  	      if (ELF_ST_TYPE (psym->st_info) == STT_GNU_IFUNC)
  		{
-@@ -2479,13 +2731,30 @@ dump_relocations (Filedata *          filedata,
+@@ -2478,13 +2730,30 @@ dump_relocations (Filedata *          filedata,
  		  else
  		    name = strtab + psym->st_name;
  
@@ -693,7 +734,7 @@ index bb81c824ac3..15064daa969 100644
  		{
  		  print_vma (psym->st_value, LONG_HEX);
  
-@@ -2500,25 +2769,49 @@ dump_relocations (Filedata *          filedata,
+@@ -2499,25 +2768,49 @@ dump_relocations (Filedata *          filedata,
  		    sec_name = printable_section_name_from_index
  		      (filedata, psym->st_shndx, NULL);
  
@@ -736,7 +777,7 @@ index bb81c824ac3..15064daa969 100644
 +				? "@@%s" : "@%s",
 +				version_string);
 +		    }
-+		  if (all_relocations)
++		  if (do_got_section_contents)
 +		    {
 +		      if (version_string)
 +			symbol_name = concat (strtab + psym->st_name,
@@ -753,7 +794,7 @@ index bb81c824ac3..15064daa969 100644
  		{
  		  uint64_t off = rels[i].r_addend;
  
-@@ -2529,7 +2822,7 @@ dump_relocations (Filedata *          filedata,
+@@ -2528,7 +2821,7 @@ dump_relocations (Filedata *          filedata,
  		}
  	    }
  	}
@@ -762,7 +803,7 @@ index bb81c824ac3..15064daa969 100644
  	{
  	  uint64_t off = rels[i].r_addend;
  
-@@ -2540,37 +2833,50 @@ dump_relocations (Filedata *          filedata,
+@@ -2539,37 +2832,50 @@ dump_relocations (Filedata *          filedata,
  	    printf ("%" PRIx64, off);
  	}
  
@@ -837,7 +878,7 @@ index bb81c824ac3..15064daa969 100644
  	}
      }
  
-@@ -6112,6 +6418,7 @@ static struct option options[] =
+@@ -6111,6 +6417,7 @@ static struct option options[] =
    {"use-dynamic",      no_argument, 0, 'D'},
    {"dynamic",	       no_argument, 0, 'd'},
    {"headers",	       no_argument, 0, 'e'},
@@ -845,7 +886,7 @@ index bb81c824ac3..15064daa969 100644
    {"section-groups",   no_argument, 0, 'g'},
    {"help",	       no_argument, 0, 'H'},
    {"file-header",      no_argument, 0, 'h'},
-@@ -6184,6 +6491,8 @@ usage (FILE * stream)
+@@ -6183,6 +6490,8 @@ usage (FILE * stream)
    fprintf (stream, _("\
       --sections          An alias for --section-headers\n"));
    fprintf (stream, _("\
@@ -854,7 +895,7 @@ index bb81c824ac3..15064daa969 100644
    -g --section-groups    Display the section groups\n"));
    fprintf (stream, _("\
    -t --section-details   Display the section details\n"));
-@@ -6418,7 +6727,7 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
+@@ -6417,7 +6726,7 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
      usage (stderr);
  
    while ((c = getopt_long
@@ -863,7 +904,7 @@ index bb81c824ac3..15064daa969 100644
      {
        switch (c)
  	{
-@@ -6442,8 +6751,13 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
+@@ -6441,8 +6750,13 @@ parse_args (struct dump_data *dumpdata, int argc, char ** argv)
  	  do_histogram = true;
  	  do_arch = true;
  	  do_notes = true;
@@ -877,7 +918,7 @@ index bb81c824ac3..15064daa969 100644
  	case 'g':
  	  do_section_groups = true;
  	  break;
-@@ -9438,7 +9752,8 @@ rel_type_from_sh_type (unsigned int sh_type)
+@@ -9437,7 +9751,8 @@ rel_type_from_sh_type (unsigned int sh_type)
  
  static bool
  display_relocations (Elf_Internal_Shdr *  section,
@@ -887,7 +928,7 @@ index bb81c824ac3..15064daa969 100644
  {
    relocation_type rel_type = rel_type_from_sh_type (section->sh_type);
  
-@@ -9450,19 +9765,23 @@ display_relocations (Elf_Internal_Shdr *  section,
+@@ -9449,19 +9764,23 @@ display_relocations (Elf_Internal_Shdr *  section,
    if (rel_size == 0)
      return false;
  
@@ -921,7 +962,7 @@ index bb81c824ac3..15064daa969 100644
  
    if (rel_type == reltype_relr)
      {
-@@ -9471,26 +9790,33 @@ display_relocations (Elf_Internal_Shdr *  section,
+@@ -9470,26 +9789,33 @@ display_relocations (Elf_Internal_Shdr *  section,
  	 the number of words in the compressed RELR format.  So also provide
  	 the number of locations affected.  */
  
@@ -969,13 +1010,13 @@ index bb81c824ac3..15064daa969 100644
    Elf_Internal_Shdr * symsec;
    Elf_Internal_Sym *  symtab = NULL;
    uint64_t            nsyms = 0;
-@@ -9522,12 +9848,15 @@ display_relocations (Elf_Internal_Shdr *  section,
-   bool res;
- 
-   if (rel_type == reltype_relr)
--    res = dump_relr_relocations (filedata, section, symtab, nsyms, strtab, strtablen);
-+    res = dump_relr_relocations (filedata, section, symtab, nsyms,
-+				 strtab, strtablen, dump_reloc);
+@@ -9524,12 +9850,15 @@ display_relocations (Elf_Internal_Shdr *  section,
+     res = dump_relr_relocations (filedata, section->sh_size,
+ 				 section->sh_entsize,
+ 				 section->sh_offset,
+-				 symtab, nsyms, strtab, strtablen);
++				 symtab, nsyms, strtab, strtablen,
++				 dump_reloc);
    else
      res = dump_relocations (filedata, rel_offset, rel_size,
  			    symtab, nsyms, strtab, strtablen,
@@ -987,7 +1028,7 @@ index bb81c824ac3..15064daa969 100644
    free (strtab);
    free (symtab);
  
-@@ -9541,14 +9870,16 @@ process_relocs (Filedata * filedata)
+@@ -9543,14 +9872,16 @@ process_relocs (Filedata * filedata)
  {
    uint64_t rel_size;
    uint64_t rel_offset;
@@ -1005,55 +1046,20 @@ index bb81c824ac3..15064daa969 100644
        bool  has_dynamic_reloc;
        unsigned int i;
  
-@@ -9556,57 +9887,97 @@ process_relocs (Filedata * filedata)
- 
-       for (i = 0; i < ARRAY_SIZE (dynamic_relocations); i++)
- 	{
-+	  rel_size = filedata->dynamic_info[dynamic_relocations [i].size];
-+
-+	  if (!rel_size)
-+	    continue;
-+
-+	  has_dynamic_reloc = true;
-+
- 	  rel_type = dynamic_relocations [i].rel_type;
- 	  name = dynamic_relocations [i].name;
--	  rel_size = filedata->dynamic_info[dynamic_relocations [i].size];
- 	  rel_offset = filedata->dynamic_info[dynamic_relocations [i].reloc];
- 
--	  if (rel_size)
--	    has_dynamic_reloc = true;
--
- 	  if (rel_type == reltype_unknown)
- 	    {
--	      if (dynamic_relocations [i].reloc == DT_JMPREL)
--		switch (filedata->dynamic_info[DT_PLTREL])
--		  {
--		  case DT_REL:
--		    rel_type = reltype_rel;
--		    break;
--		  case DT_RELA:
--		    rel_type = reltype_rela;
--		    break;
--		  }
-+	      if (dynamic_relocations [i].reloc != DT_JMPREL)
-+		abort ();
-+
-+	      switch (filedata->dynamic_info[DT_PLTREL])
-+		{
-+		default:
-+		  printf (_("<missing dynamic or corrupt tag: DT_PLTREL>\n"));
-+		  continue;
-+		case DT_REL:
-+		  rel_type = reltype_rel;
-+		  break;
-+		case DT_RELA:
-+		  rel_type = reltype_rela;
-+		  break;
-+		}
+@@ -9584,16 +9915,37 @@ process_relocs (Filedata * filedata)
+ 		}
  	    }
  
--	  if (rel_size)
+-	  if (filedata->is_separate)
+-	    printf
+-	      (_("\nIn linked file '%s' section '%s' at offset %#" PRIx64
+-		 " contains %" PRId64 " bytes:\n"),
+-	       filedata->file_name, name, rel_offset, rel_size);
+-	  else
+-	    printf
+-	      (_("\n'%s' relocation section at offset %#" PRIx64
+-		 " contains %" PRId64 " bytes:\n"),
+-	       name, rel_offset, rel_size);
 +	  switch (rel_type)
 +	    {
 +	    default:
@@ -1073,22 +1079,38 @@ index bb81c824ac3..15064daa969 100644
 +	    }
 +
 +	  if (do_reloc)
- 	    {
- 	      if (filedata->is_separate)
- 		printf
--		  (_("\nIn linked file '%s' section '%s' at offset %#" PRIx64
--		     " contains %" PRId64 " bytes:\n"),
++	    {
++	      if (filedata->is_separate)
++		printf
 +		  (_("\nIn linked file '%s' section '%s' at offset"
 +		     "%#" PRIx64 " contains %" PRId64 " bytes:\n"),
- 		   filedata->file_name, name, rel_offset, rel_size);
- 	      else
- 		printf
- 		  (_("\n'%s' relocation section at offset %#" PRIx64
- 		     " contains %" PRId64 " bytes:\n"),
- 		   name, rel_offset, rel_size);
++		   filedata->file_name, name, rel_offset, rel_size);
++	      else
++		printf
++		  (_("\n'%s' relocation section at offset %#" PRIx64
++		     " contains %" PRId64 " bytes:\n"),
++		   name, rel_offset, rel_size);
 +	    }
-+
-+	  if (rel_type != reltype_relr)
+ 
+ 	  if (rel_type == reltype_relr)
+ 	    dump_relr_relocations (filedata,
+@@ -9603,24 +9955,37 @@ process_relocs (Filedata * filedata)
+ 				   filedata->dynamic_symbols,
+ 				   filedata->num_dynamic_syms,
+ 				   filedata->dynamic_strings,
+-				   filedata->dynamic_strings_length);
++				   filedata->dynamic_strings_length,
++				   do_reloc);
+ 	  else
+-	    dump_relocations (filedata,
+-			      offset_from_vma (filedata, rel_offset,
+-					       rel_size),
+-			      rel_size,
+-			      filedata->dynamic_symbols,
+-			      filedata->num_dynamic_syms,
+-			      filedata->dynamic_strings,
+-			      filedata->dynamic_strings_length,
+-			      rel_type, true /* is_dynamic */);
 +	    {
 +	      if (rel_entsz == 0)
 +		{
@@ -1098,33 +1120,30 @@ index bb81c824ac3..15064daa969 100644
 +		}
 +
 +	      update_all_relocations (rel_size / rel_entsz);
- 
- 	      dump_relocations (filedata,
--				offset_from_vma (filedata, rel_offset, rel_size),
++
++	      dump_relocations (filedata,
 +				offset_from_vma (filedata, rel_offset,
 +						 rel_size),
- 				rel_size,
- 				filedata->dynamic_symbols,
- 				filedata->num_dynamic_syms,
- 				filedata->dynamic_strings,
- 				filedata->dynamic_strings_length,
--				rel_type, true /* is_dynamic */);
++				rel_size,
++				filedata->dynamic_symbols,
++				filedata->num_dynamic_syms,
++				filedata->dynamic_strings,
++				filedata->dynamic_strings_length,
 +				rel_type, true /* is_dynamic */,
 +				do_reloc);
- 	    }
++	    }
  	}
  
-       if (is_ia64_vms (filedata))
--        if (process_ia64_vms_dynamic_relocs (filedata))
-+	if (process_ia64_vms_dynamic_relocs (filedata))
- 	  has_dynamic_reloc = true;
+       if (is_ia64_vms (filedata)
+ 	  && process_ia64_vms_dynamic_relocs (filedata))
+ 	has_dynamic_reloc = true;
  
 -      if (! has_dynamic_reloc)
 +      if (do_reloc && ! has_dynamic_reloc)
  	{
  	  if (filedata->is_separate)
  	    printf (_("\nThere are no dynamic relocations in linked file '%s'.\n"),
-@@ -9625,11 +9996,11 @@ process_relocs (Filedata * filedata)
+@@ -9639,11 +10004,11 @@ process_relocs (Filedata * filedata)
  	   i < filedata->file_header.e_shnum;
  	   i++, section++)
  	{
@@ -1138,7 +1157,7 @@ index bb81c824ac3..15064daa969 100644
  	{
  	  /* Users sometimes forget the -D option, so try to be helpful.  */
  	  for (i = 0; i < ARRAY_SIZE (dynamic_relocations); i++)
-@@ -17613,7 +17984,7 @@ process_section_contents (Filedata * filedata)
+@@ -17627,7 +17992,7 @@ process_section_contents (Filedata * filedata)
  	    case SHT_RELA:
  	    case SHT_REL:
  	    case SHT_RELR:
@@ -1147,15 +1166,15 @@ index bb81c824ac3..15064daa969 100644
  	      break;
  
  	    case SHT_NOTE:
-@@ -17704,6 +18075,196 @@ process_section_contents (Filedata * filedata)
+@@ -17718,6 +18083,196 @@ process_section_contents (Filedata * filedata)
    return res;
  }
  
 +static int
 +elf_relocation_cmp (const void *p, const void *q)
 +{
-+  elf_relocation *rp = (elf_relocation *) p;
-+  elf_relocation *rq = (elf_relocation *) q;
++  const elf_relocation *rp = (const elf_relocation *) p;
++  const elf_relocation *rq = (const elf_relocation *) q;
 +
 +  return (rp->r_offset > rq->r_offset
 +	  ? 1
@@ -1344,7 +1363,7 @@ index bb81c824ac3..15064daa969 100644
  static void
  process_mips_fpe_exception (int mask)
  {
-@@ -23819,6 +24380,9 @@ process_object (Filedata * filedata)
+@@ -23833,6 +24388,9 @@ process_object (Filedata * filedata)
    if (! process_section_contents (filedata))
      res = false;
  
@@ -1435,7 +1454,7 @@ index 00000000000..b8609b8fbe2
 +#pass
 diff --git a/ld/testsuite/ld-i386/libgot-1b.rd b/ld/testsuite/ld-i386/libgot-1b.rd
 new file mode 100644
-index 00000000000..070fa424d4d
+index 00000000000..faebdb49e0d
 --- /dev/null
 +++ b/ld/testsuite/ld-i386/libgot-1b.rd
 @@ -0,0 +1,119 @@
@@ -1549,50 +1568,50 @@ index 00000000000..070fa424d4d
 +
 +Global Offset Table '.got' contains 1 entry:
 +   Index:  Address      Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 002001fc R_386_GLOB_DAT         foo \+ 0
++ +[0-9]+: 002001fc R_386_GLOB_DAT         foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 +   Index:  Address      Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200200                        20016c
-+ +[a-f0-9]+: 00200204                        0
-+ +[a-f0-9]+: 00200208                        0
-+ +[a-f0-9]+: 0020020c R_386_JUMP_SLOT        bar \+ 156
++ +[0-9]+: 00200200                        20016c
++ +[0-9]+: 00200204                        0
++ +[0-9]+: 00200208                        0
++ +[0-9]+: 0020020c R_386_JUMP_SLOT        bar \+ 156
 +#pass
 diff --git a/ld/testsuite/ld-i386/libgot-1c.rd b/ld/testsuite/ld-i386/libgot-1c.rd
 new file mode 100644
-index 00000000000..a69279ab8cc
+index 00000000000..374b03f1658
 --- /dev/null
 +++ b/ld/testsuite/ld-i386/libgot-1c.rd
 @@ -0,0 +1,12 @@
 +
 +Global Offset Table '.got' contains 1 entry:
 + Index:  Address      Reloc        Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 002001fc R_386_GLOB_DAT    foo \+ 0
++ +[0-9]+: 002001fc R_386_GLOB_DAT    foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 + Index:  Address      Reloc        Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200200                   20016c
-+ +[a-f0-9]+: 00200204                   0
-+ +[a-f0-9]+: 00200208                   0
-+ +[a-f0-9]+: 0020020c R_386_JUMP_SLOT   bar \+ 156
++ +[0-9]+: 00200200                   20016c
++ +[0-9]+: 00200204                   0
++ +[0-9]+: 00200208                   0
++ +[0-9]+: 0020020c R_386_JUMP_SLOT   bar \+ 156
 +#pass
 diff --git a/ld/testsuite/ld-i386/libgot-1d.rd b/ld/testsuite/ld-i386/libgot-1d.rd
 new file mode 100644
-index 00000000000..af5e3df0153
+index 00000000000..632b47be743
 --- /dev/null
 +++ b/ld/testsuite/ld-i386/libgot-1d.rd
 @@ -0,0 +1,12 @@
 +
 +Global Offset Table '.got' contains 1 entry:
 +   Index:  Address      Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 002001fc R_386_GLOB_DAT         foo \+ 0
++ +[0-9]+: 002001fc R_386_GLOB_DAT         foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 +   Index:  Address      Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200200                        20016c
-+ +[a-f0-9]+: 00200204                        0
-+ +[a-f0-9]+: 00200208                        0
-+ +[a-f0-9]+: 0020020c R_386_JUMP_SLOT        bar \+ 156
++ +[0-9]+: 00200200                        20016c
++ +[0-9]+: 00200204                        0
++ +[0-9]+: 00200208                        0
++ +[0-9]+: 0020020c R_386_JUMP_SLOT        bar \+ 156
 +#pass
 diff --git a/ld/testsuite/ld-x86-64/binutils.exp b/ld/testsuite/ld-x86-64/binutils.exp
 new file mode 100644
@@ -1704,7 +1723,7 @@ index 00000000000..8ed447003c7
 +#pass
 diff --git a/ld/testsuite/ld-x86-64/libgot-1b-x32.rd b/ld/testsuite/ld-x86-64/libgot-1b-x32.rd
 new file mode 100644
-index 00000000000..2245275b980
+index 00000000000..f900303fcce
 --- /dev/null
 +++ b/ld/testsuite/ld-x86-64/libgot-1b-x32.rd
 @@ -0,0 +1,119 @@
@@ -1818,18 +1837,18 @@ index 00000000000..2245275b980
 +
 +Global Offset Table '.got' contains 1 entry:
 +   Index:  Address      Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200200 R_X86_64_GLOB_DAT      foo \+ 0
++ +[0-9]+: 00200200 R_X86_64_GLOB_DAT      foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 +   Index:  Address      Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200208                        20016c
-+ +[a-f0-9]+: 00200210                        0
-+ +[a-f0-9]+: 00200218                        0
-+ +[a-f0-9]+: 00200220 R_X86_64_JUMP_SLOT     bar \+ 0
++ +[0-9]+: 00200208                        20016c
++ +[0-9]+: 00200210                        0
++ +[0-9]+: 00200218                        0
++ +[0-9]+: 00200220 R_X86_64_JUMP_SLOT     bar \+ 0
 +#pass
 diff --git a/ld/testsuite/ld-x86-64/libgot-1b.rd b/ld/testsuite/ld-x86-64/libgot-1b.rd
 new file mode 100644
-index 00000000000..9d5cc030f72
+index 00000000000..18e432475fc
 --- /dev/null
 +++ b/ld/testsuite/ld-x86-64/libgot-1b.rd
 @@ -0,0 +1,119 @@
@@ -1943,89 +1962,87 @@ index 00000000000..9d5cc030f72
 +
 +Global Offset Table '.got' contains 1 entry:
 +   Index:      Address          Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 0000000000200340 R_X86_64_GLOB_DAT      foo \+ 0
++ +[0-9]+: 0000000000200340 R_X86_64_GLOB_DAT      foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 +   Index:      Address          Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 0000000000200348                        200220
-+ +[a-f0-9]+: 0000000000200350                        0
-+ +[a-f0-9]+: 0000000000200358                        0
-+ +[a-f0-9]+: 0000000000200360 R_X86_64_JUMP_SLOT     bar \+ 0
++ +[0-9]+: 0000000000200348                        200220
++ +[0-9]+: 0000000000200350                        0
++ +[0-9]+: 0000000000200358                        0
++ +[0-9]+: 0000000000200360 R_X86_64_JUMP_SLOT     bar \+ 0
 +#pass
 diff --git a/ld/testsuite/ld-x86-64/libgot-1c-x32.rd b/ld/testsuite/ld-x86-64/libgot-1c-x32.rd
 new file mode 100644
-index 00000000000..bec8ac79e07
+index 00000000000..a3bdacf1fa4
 --- /dev/null
 +++ b/ld/testsuite/ld-x86-64/libgot-1c-x32.rd
 @@ -0,0 +1,12 @@
 +
 +Global Offset Table '.got' contains 1 entry:
 + Index:  Address      Reloc        Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200200 R_X86_64_GLOB_DAT foo \+ 0
++ +[0-9]+: 00200200 R_X86_64_GLOB_DAT foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 + Index:  Address      Reloc        Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200208                   20016c
-+ +[a-f0-9]+: 00200210                   0
-+ +[a-f0-9]+: 00200218                   0
-+ +[a-f0-9]+: 00200220 R_X86_64_JUMP_SLO bar \+ 0
++ +[0-9]+: 00200208                   20016c
++ +[0-9]+: 00200210                   0
++ +[0-9]+: 00200218                   0
++ +[0-9]+: 00200220 R_X86_64_JUMP_SLO bar \+ 0
 +#pass
 diff --git a/ld/testsuite/ld-x86-64/libgot-1c.rd b/ld/testsuite/ld-x86-64/libgot-1c.rd
 new file mode 100644
-index 00000000000..4944b3111c3
+index 00000000000..fc1a2605848
 --- /dev/null
 +++ b/ld/testsuite/ld-x86-64/libgot-1c.rd
 @@ -0,0 +1,12 @@
 +
 +Global Offset Table '.got' contains 1 entry:
 + Index:    Address       Reloc         Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 000000200340 R_X86_64_GLOB_DAT foo \+ 0
++ +[0-9]+: 000000200340 R_X86_64_GLOB_DAT foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 + Index:    Address       Reloc         Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 000000200348                   200220
-+ +[a-f0-9]+: 000000200350                   0
-+ +[a-f0-9]+: 000000200358                   0
-+ +[a-f0-9]+: 000000200360 R_X86_64_JUMP_SLO bar \+ 0
++ +[0-9]+: 000000200348                   200220
++ +[0-9]+: 000000200350                   0
++ +[0-9]+: 000000200358                   0
++ +[0-9]+: 000000200360 R_X86_64_JUMP_SLO bar \+ 0
 +#pass
 diff --git a/ld/testsuite/ld-x86-64/libgot-1d-x32.rd b/ld/testsuite/ld-x86-64/libgot-1d-x32.rd
 new file mode 100644
-index 00000000000..fdad77aab84
+index 00000000000..3e2693e0f52
 --- /dev/null
 +++ b/ld/testsuite/ld-x86-64/libgot-1d-x32.rd
 @@ -0,0 +1,12 @@
 +
 +Global Offset Table '.got' contains 1 entry:
 +   Index:  Address      Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200200 R_X86_64_GLOB_DAT      foo \+ 0
++ +[0-9]+: 00200200 R_X86_64_GLOB_DAT      foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 +   Index:  Address      Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 00200208                        20016c
-+ +[a-f0-9]+: 00200210                        0
-+ +[a-f0-9]+: 00200218                        0
-+ +[a-f0-9]+: 00200220 R_X86_64_JUMP_SLOT     bar \+ 0
++ +[0-9]+: 00200208                        20016c
++ +[0-9]+: 00200210                        0
++ +[0-9]+: 00200218                        0
++ +[0-9]+: 00200220 R_X86_64_JUMP_SLOT     bar \+ 0
 +#pass
 diff --git a/ld/testsuite/ld-x86-64/libgot-1d.rd b/ld/testsuite/ld-x86-64/libgot-1d.rd
 new file mode 100644
-index 00000000000..2e0a6c1e0db
+index 00000000000..341840e9081
 --- /dev/null
 +++ b/ld/testsuite/ld-x86-64/libgot-1d.rd
 @@ -0,0 +1,12 @@
 +
 +Global Offset Table '.got' contains 1 entry:
 +   Index:      Address          Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 0000000000200340 R_X86_64_GLOB_DAT      foo \+ 0
++ +[0-9]+: 0000000000200340 R_X86_64_GLOB_DAT      foo \+ 0
 +
 +Global Offset Table '.got.plt' contains 4 entries:
 +   Index:      Address          Reloc             Sym. Name \+ Addend/Value
-+ +[a-f0-9]+: 0000000000200348                        200220
-+ +[a-f0-9]+: 0000000000200350                        0
-+ +[a-f0-9]+: 0000000000200358                        0
-+ +[a-f0-9]+: 0000000000200360 R_X86_64_JUMP_SLOT     bar \+ 0
++ +[0-9]+: 0000000000200348                        200220
++ +[0-9]+: 0000000000200350                        0
++ +[0-9]+: 0000000000200358                        0
++ +[0-9]+: 0000000000200360 R_X86_64_JUMP_SLOT     bar \+ 0
 +#pass
-
-base-commit: f5493d6c96da9faf5f16d748cf6c899f0836b12d
 -- 
 2.51.0
 
