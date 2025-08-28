@@ -1,4 +1,5 @@
-From 68498caec29f2d1ae5302a5d462190f4b9d3e541 Mon Sep 17 00:00:00 2001
+From 59c754fcc3081053610842bdd288726fedc8c91b Mon Sep 17 00:00:00 2001
+Message-ID: <59c754fcc3081053610842bdd288726fedc8c91b.1756412415.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Mon, 25 Aug 2025 18:00:00 -0700
 Subject: [PATCH] readelf: Add --got-contents option
@@ -27,6 +28,8 @@ and cache them in all_relocations.  Don't display relocations if not
 requested.
 3. Add process_got_section_contents to display contents of GOT sections
 by matching the GOT entry offset against the cached relocations.
+4. Update process_mips_specific to only display the GOT related contents
+for --got-contents.
 
 binutils/
 
@@ -45,12 +48,16 @@ binutils/
 	(options): Add --got-contents.
 	(usage): Show --got-contents.
 	(parse_args): Support --got-contents.
-	(display_relocations): Add bool argument, dump_reloc, to indicate
-	if relocations should be displayed.  Call update_all_relocations.
-	Pass dump_reloc to dump_relr_relocations and dump_relocations.
+	(display_relocations): Add a bool argument, dump_reloc, to
+	indicate if relocations should be displayed.  Call
+	update_all_relocations.  Pass dump_reloc to dump_relr_relocations
+	and dump_relocations.
 	(process_relocs): Check do_got_section_contents.  Handle
 	do_got_section_contents for dynamic relocations.
 	(process_section_contents): Pass true to display_relocations.
+	(process_mips_specific): Add a bool argument, dump_got, to
+	indicate if only the GOT related contents should be displayed.
+	Display all MIPS specific information if dump_got is false.
 	(elf_relocation_cmp): New.
 	(display_elf_relocation_at): Likewise.
 	(process_got_section_contents): Likewise.
@@ -78,26 +85,26 @@ ld/
 
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
- binutils/NEWS                           |   3 +
- binutils/doc/binutils.texi              |  10 +-
- binutils/readelf.c                      | 878 +++++++++++++++++++-----
- ld/testsuite/ld-i386/binutils.exp       |  45 ++
- ld/testsuite/ld-i386/got-1.s            |   7 +
- ld/testsuite/ld-i386/libgot-1a.rd       |   9 +
- ld/testsuite/ld-i386/libgot-1b.rd       | 119 ++++
- ld/testsuite/ld-i386/libgot-1c.rd       |  12 +
- ld/testsuite/ld-i386/libgot-1d.rd       |  12 +
- ld/testsuite/ld-x86-64/binutils.exp     |  59 ++
- ld/testsuite/ld-x86-64/got-1.s          |   7 +
- ld/testsuite/ld-x86-64/libgot-1a-x32.rd |   9 +
- ld/testsuite/ld-x86-64/libgot-1a.rd     |   9 +
- ld/testsuite/ld-x86-64/libgot-1b-x32.rd | 119 ++++
- ld/testsuite/ld-x86-64/libgot-1b.rd     | 119 ++++
- ld/testsuite/ld-x86-64/libgot-1c-x32.rd |  12 +
- ld/testsuite/ld-x86-64/libgot-1c.rd     |  12 +
- ld/testsuite/ld-x86-64/libgot-1d-x32.rd |  12 +
- ld/testsuite/ld-x86-64/libgot-1d.rd     |  12 +
- 19 files changed, 1305 insertions(+), 160 deletions(-)
+ binutils/NEWS                           |    3 +
+ binutils/doc/binutils.texi              |   12 +-
+ binutils/readelf.c                      | 1004 ++++++++++++++++++-----
+ ld/testsuite/ld-i386/binutils.exp       |   45 +
+ ld/testsuite/ld-i386/got-1.s            |    7 +
+ ld/testsuite/ld-i386/libgot-1a.rd       |    9 +
+ ld/testsuite/ld-i386/libgot-1b.rd       |  119 +++
+ ld/testsuite/ld-i386/libgot-1c.rd       |   12 +
+ ld/testsuite/ld-i386/libgot-1d.rd       |   12 +
+ ld/testsuite/ld-x86-64/binutils.exp     |   59 ++
+ ld/testsuite/ld-x86-64/got-1.s          |    7 +
+ ld/testsuite/ld-x86-64/libgot-1a-x32.rd |    9 +
+ ld/testsuite/ld-x86-64/libgot-1a.rd     |    9 +
+ ld/testsuite/ld-x86-64/libgot-1b-x32.rd |  119 +++
+ ld/testsuite/ld-x86-64/libgot-1b.rd     |  119 +++
+ ld/testsuite/ld-x86-64/libgot-1c-x32.rd |   12 +
+ ld/testsuite/ld-x86-64/libgot-1c.rd     |   12 +
+ ld/testsuite/ld-x86-64/libgot-1d-x32.rd |   12 +
+ ld/testsuite/ld-x86-64/libgot-1d.rd     |   12 +
+ 19 files changed, 1378 insertions(+), 215 deletions(-)
  create mode 100644 ld/testsuite/ld-i386/binutils.exp
  create mode 100644 ld/testsuite/ld-i386/got-1.s
  create mode 100644 ld/testsuite/ld-i386/libgot-1a.rd
@@ -129,7 +136,7 @@ index ccda8559897..0a4ed3bcc43 100644
    in some errors being exposed in user options passed to the various binutils.
    For example objcopy --target=TARGET now will only work if the input file is
 diff --git a/binutils/doc/binutils.texi b/binutils/doc/binutils.texi
-index 4543341e00c..6217dd76d90 100644
+index 4543341e00c..89425b8a15b 100644
 --- a/binutils/doc/binutils.texi
 +++ b/binutils/doc/binutils.texi
 @@ -5076,6 +5076,7 @@ readelf [@option{-a}|@option{--all}]
@@ -150,7 +157,7 @@ index 4543341e00c..6217dd76d90 100644
  @option{--section-groups} and @option{--histogram}.
  
  Note - this option does not enable @option{--use-dynamic} itself, so
-@@ -5387,6 +5389,12 @@ string table are used.
+@@ -5387,6 +5389,14 @@ string table are used.
  If either of @option{--ctf-symbols} or @option{--ctf-strings} is specified, the
  other must be specified as well.
  
@@ -158,13 +165,15 @@ index 4543341e00c..6217dd76d90 100644
 +@cindex ELF section information
 +@cindex ELF reloc information
 +Displays the contents of the file's Global Offset Table (GOT) sections,
-+if it has any.
++if it has any.  For MIPS, this option is similar to
++@option{--arch-specific}, but it only displays the GOT related contents
++and it is ignored when @option{--arch-specific} is used.
 +
  @item -I
  @itemx --histogram
  Display a histogram of bucket list lengths when displaying the contents
 diff --git a/binutils/readelf.c b/binutils/readelf.c
-index 68e193415f2..a58ad8d116c 100644
+index 68e193415f2..2affc713adb 100644
 --- a/binutils/readelf.c
 +++ b/binutils/readelf.c
 @@ -229,6 +229,7 @@ static bool do_dyn_syms = false;
@@ -603,14 +612,14 @@ index 68e193415f2..a58ad8d116c 100644
        symtab_index = get_reloc_symindex  (inf);
  
 -      if (is_32bit_elf)
-+      if (dump_reloc)
- 	{
+-	{
 -	  printf ("%8.8lx  %8.8lx ",
 -		  (unsigned long) offset & 0xffffffff,
 -		  (unsigned long) inf & 0xffffffff);
 -	}
 -      else
--	{
++      if (dump_reloc)
+ 	{
 -	  printf (do_wide
 -		  ? "%16.16" PRIx64 "  %16.16" PRIx64 " "
 -		  : "%12.12" PRIx64 "  %12.12" PRIx64 " ",
@@ -1181,8 +1190,162 @@ index 68e193415f2..a58ad8d116c 100644
  	      break;
  
  	    case SHT_NOTE:
-@@ -17718,6 +18085,196 @@ process_section_contents (Filedata * filedata)
-   return res;
+@@ -19644,8 +20011,11 @@ get_mips_reg_size (int reg_size)
+ 	 : -1;
+ }
+ 
++/* If DUMP_GOT is true, display only the GOT related contents.
++   Otherwise, display all MIPS specific information.  */
++
+ static bool
+-process_mips_specific (Filedata * filedata)
++process_mips_specific (Filedata * filedata, bool dump_got)
+ {
+   Elf_Internal_Dyn * entry;
+   Elf_Internal_Shdr *sect = NULL;
+@@ -19664,60 +20034,63 @@ process_mips_specific (Filedata * filedata)
+   uint64_t symtabno = 0;
+   bool res = true;
+ 
+-  if (! process_attributes (filedata, NULL, SHT_GNU_ATTRIBUTES, NULL,
+-			    display_mips_gnu_attribute))
+-    res = false;
+-
+-  sect = find_section (filedata, ".MIPS.abiflags");
+-
+-  if (sect != NULL)
++  if (!dump_got)
+     {
+-      Elf_External_ABIFlags_v0 *abiflags_ext;
+-      Elf_Internal_ABIFlags_v0 abiflags_in;
++      if (! process_attributes (filedata, NULL, SHT_GNU_ATTRIBUTES, NULL,
++				display_mips_gnu_attribute))
++	res = false;
+ 
+-      if (sizeof (Elf_External_ABIFlags_v0) != sect->sh_size)
+-	{
+-	  error (_("Corrupt MIPS ABI Flags section.\n"));
+-	  res = false;
+-	}
+-      else
++      sect = find_section (filedata, ".MIPS.abiflags");
++
++      if (sect != NULL)
+ 	{
+-	  abiflags_ext = get_data (NULL, filedata, sect->sh_offset, 1,
+-				   sect->sh_size, _("MIPS ABI Flags section"));
+-	  if (abiflags_ext)
++	  Elf_External_ABIFlags_v0 *abiflags_ext;
++	  Elf_Internal_ABIFlags_v0 abiflags_in;
++
++	  if (sizeof (Elf_External_ABIFlags_v0) != sect->sh_size)
+ 	    {
+-	      abiflags_in.version = BYTE_GET (abiflags_ext->version);
+-	      abiflags_in.isa_level = BYTE_GET (abiflags_ext->isa_level);
+-	      abiflags_in.isa_rev = BYTE_GET (abiflags_ext->isa_rev);
+-	      abiflags_in.gpr_size = BYTE_GET (abiflags_ext->gpr_size);
+-	      abiflags_in.cpr1_size = BYTE_GET (abiflags_ext->cpr1_size);
+-	      abiflags_in.cpr2_size = BYTE_GET (abiflags_ext->cpr2_size);
+-	      abiflags_in.fp_abi = BYTE_GET (abiflags_ext->fp_abi);
+-	      abiflags_in.isa_ext = BYTE_GET (abiflags_ext->isa_ext);
+-	      abiflags_in.ases = BYTE_GET (abiflags_ext->ases);
+-	      abiflags_in.flags1 = BYTE_GET (abiflags_ext->flags1);
+-	      abiflags_in.flags2 = BYTE_GET (abiflags_ext->flags2);
+-
+-	      printf ("\nMIPS ABI Flags Version: %d\n", abiflags_in.version);
+-	      printf ("\nISA: MIPS%d", abiflags_in.isa_level);
+-	      if (abiflags_in.isa_rev > 1)
+-		printf ("r%d", abiflags_in.isa_rev);
+-	      printf ("\nGPR size: %d",
+-		      get_mips_reg_size (abiflags_in.gpr_size));
+-	      printf ("\nCPR1 size: %d",
+-		      get_mips_reg_size (abiflags_in.cpr1_size));
+-	      printf ("\nCPR2 size: %d",
+-		      get_mips_reg_size (abiflags_in.cpr2_size));
+-	      fputs ("\nFP ABI: ", stdout);
+-	      print_mips_fp_abi_value (abiflags_in.fp_abi);
+-	      fputs ("ISA Extension: ", stdout);
+-	      print_mips_isa_ext (abiflags_in.isa_ext);
+-	      fputs ("\nASEs:", stdout);
+-	      print_mips_ases (abiflags_in.ases);
+-	      printf ("\nFLAGS 1: %8.8lx", abiflags_in.flags1);
+-	      printf ("\nFLAGS 2: %8.8lx", abiflags_in.flags2);
+-	      fputc ('\n', stdout);
+-	      free (abiflags_ext);
++	      error (_("Corrupt MIPS ABI Flags section.\n"));
++	      res = false;
++	    }
++	  else
++	    {
++	      abiflags_ext = get_data (NULL, filedata, sect->sh_offset, 1,
++				       sect->sh_size, _("MIPS ABI Flags section"));
++	      if (abiflags_ext)
++		{
++		  abiflags_in.version = BYTE_GET (abiflags_ext->version);
++		  abiflags_in.isa_level = BYTE_GET (abiflags_ext->isa_level);
++		  abiflags_in.isa_rev = BYTE_GET (abiflags_ext->isa_rev);
++		  abiflags_in.gpr_size = BYTE_GET (abiflags_ext->gpr_size);
++		  abiflags_in.cpr1_size = BYTE_GET (abiflags_ext->cpr1_size);
++		  abiflags_in.cpr2_size = BYTE_GET (abiflags_ext->cpr2_size);
++		  abiflags_in.fp_abi = BYTE_GET (abiflags_ext->fp_abi);
++		  abiflags_in.isa_ext = BYTE_GET (abiflags_ext->isa_ext);
++		  abiflags_in.ases = BYTE_GET (abiflags_ext->ases);
++		  abiflags_in.flags1 = BYTE_GET (abiflags_ext->flags1);
++		  abiflags_in.flags2 = BYTE_GET (abiflags_ext->flags2);
++
++		  printf ("\nMIPS ABI Flags Version: %d\n", abiflags_in.version);
++		  printf ("\nISA: MIPS%d", abiflags_in.isa_level);
++		  if (abiflags_in.isa_rev > 1)
++		    printf ("r%d", abiflags_in.isa_rev);
++		  printf ("\nGPR size: %d",
++			  get_mips_reg_size (abiflags_in.gpr_size));
++		  printf ("\nCPR1 size: %d",
++			  get_mips_reg_size (abiflags_in.cpr1_size));
++		  printf ("\nCPR2 size: %d",
++			  get_mips_reg_size (abiflags_in.cpr2_size));
++		  fputs ("\nFP ABI: ", stdout);
++		  print_mips_fp_abi_value (abiflags_in.fp_abi);
++		  fputs ("ISA Extension: ", stdout);
++		  print_mips_isa_ext (abiflags_in.isa_ext);
++		  fputs ("\nASEs:", stdout);
++		  print_mips_ases (abiflags_in.ases);
++		  printf ("\nFLAGS 1: %8.8lx", abiflags_in.flags1);
++		  printf ("\nFLAGS 2: %8.8lx", abiflags_in.flags2);
++		  fputc ('\n', stdout);
++		  free (abiflags_ext);
++		}
+ 	    }
+ 	}
+     }
+@@ -19865,7 +20238,7 @@ process_mips_specific (Filedata * filedata)
+ 	break;
+       }
+ 
+-  if (liblist_offset != 0 && liblistno != 0 && do_dynamic)
++  if (!dump_got && liblist_offset != 0 && liblistno != 0 && do_dynamic)
+     {
+       Elf32_External_Lib * elib;
+       size_t cnt;
+@@ -19950,7 +20323,7 @@ process_mips_specific (Filedata * filedata)
+ 	res = false;
+     }
+ 
+-  if (options_offset != 0)
++  if (!dump_got && options_offset != 0)
+     {
+       Elf_External_Options * eopt;
+       size_t offset;
+@@ -20199,7 +20572,7 @@ process_mips_specific (Filedata * filedata)
+ 	res = false;
+     }
+ 
+-  if (conflicts_offset != 0 && conflictsno != 0)
++  if (!dump_got && conflicts_offset != 0 && conflictsno != 0)
+     {
+       Elf32_Conflict * iconf;
+       size_t cnt;
+@@ -20558,6 +20931,206 @@ process_nds32_specific (Filedata * filedata)
+   return true;
  }
  
 +static int
@@ -1264,8 +1427,18 @@ index 68e193415f2..a58ad8d116c 100644
 +  unsigned char *data;
 +  bool res = true;
 +
-+  if (! do_got_section_contents)
++  if (!do_got_section_contents)
 +    return res;
++
++  switch (filedata->file_header.e_machine)
++    {
++    case EM_MIPS:
++    case EM_MIPS_RS3_LE:
++      /* process_mips_specific also displays GOT related contents.  */
++      if (!do_arch)
++	res = process_mips_specific (filedata, true);
++      goto out;
++    }
 +
 +  qsort (all_relocations_root, all_relocations_count,
 +	 sizeof (elf_relocation), elf_relocation_cmp);
@@ -1316,10 +1489,10 @@ index 68e193415f2..a58ad8d116c 100644
 +		      /* |---9---| |---8--| |---------22---------| |...........  */
 +	    else
 +	      printf (_(" Index:  Address      Reloc        Sym. Name + Addend/Value\n"));
-+		      /* |--7--| |---8--| |-------17------| |...........  */
++		    /* |--7--| |---8--| |-------17------| |...........  */
++
 +	    addr = section->sh_addr;
 +	    got = (struct got32 *) data;
-+
 +	    for (j = 0; j < n; j++)
 +	      {
 +		g = BYTE_GET (got[j].bytes);
@@ -1375,10 +1548,19 @@ index 68e193415f2..a58ad8d116c 100644
 +  return res;
 +}
 +
- static void
- process_mips_fpe_exception (int mask)
+ static bool
+ process_gnu_liblist (Filedata * filedata)
  {
-@@ -23833,6 +24390,9 @@ process_object (Filedata * filedata)
+@@ -23469,7 +24042,7 @@ process_arch_specific (Filedata * filedata)
+ 
+     case EM_MIPS:
+     case EM_MIPS_RS3_LE:
+-      return process_mips_specific (filedata);
++      return process_mips_specific (filedata, false);
+ 
+     case EM_MSP430:
+      return process_attributes (filedata, "mspabi", SHT_MSP430_ATTRIBUTES,
+@@ -23833,6 +24406,9 @@ process_object (Filedata * filedata)
    if (! process_section_contents (filedata))
      res = false;
  
@@ -2059,4 +2241,5 @@ index 00000000000..341840e9081
 + +[0-9]+: 0000000000200360 R_X86_64_JUMP_SLOT     bar \+ 0
 +#pass
 -- 
-GitLab
+2.51.0
+
