@@ -1,7 +1,10 @@
-From 845089ce66869d79e86869ec1972a33036010706 Mon Sep 17 00:00:00 2001
+From c888b2e67d8e45c20aac1912ff9cd34cbea48d9e Mon Sep 17 00:00:00 2001
+Message-ID: <c888b2e67d8e45c20aac1912ff9cd34cbea48d9e.1758805647.git.sam@gentoo.org>
+In-Reply-To: <4ebcb339f9d678aef53596022a3e6125dfed109a.1758805647.git.sam@gentoo.org>
+References: <4ebcb339f9d678aef53596022a3e6125dfed109a.1758805647.git.sam@gentoo.org>
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Wed, 22 Feb 2023 20:05:35 +0100
-Subject: [PATCH 4/5] Apply a similar libiberty fix as in 7d53105d for
+Subject: [PATCH 4/4] Apply a similar libiberty fix as in 7d53105d for
  libopcodes and libgprofng
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -32,10 +35,10 @@ index f6d3f5da759..36c334bb359 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/gprofng/src/Makefile.in b/gprofng/src/Makefile.in
-index 0cdd4443670..8021b2d4a3d 100644
+index 0a1934e8344..374a887adae 100644
 --- a/gprofng/src/Makefile.in
 +++ b/gprofng/src/Makefile.in
-@@ -552,7 +552,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
+@@ -558,7 +558,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
  # Pass -lpthread instead of $(PTHREAD_LIBS) due to $(PTHREAD_LIBS) being empty
  # when -nostdlib is passed to libtool.
  # See bug 29364 - libgprofng.so: needs to link against -pthread
@@ -46,10 +49,10 @@ index 0cdd4443670..8021b2d4a3d 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/opcodes/configure b/opcodes/configure
-index 3dd6b692f89..54544895689 100755
+index df9f63d1031..8c46bcf79ba 100755
 --- a/opcodes/configure
 +++ b/opcodes/configure
-@@ -13881,10 +13881,10 @@ if test "$enable_shared" = "yes"; then
+@@ -14256,10 +14256,10 @@ if test "$enable_shared" = "yes"; then
    case "${host}" in
      *-*-cygwin*)
        SHARED_LDFLAGS="-no-undefined"
@@ -63,10 +66,10 @@ index 3dd6b692f89..54544895689 100755
        ;;
    esac
 diff --git a/opcodes/configure.ac b/opcodes/configure.ac
-index e31ddde9e57..8fdf538ecf8 100644
+index 675f0662700..0220ec13312 100644
 --- a/opcodes/configure.ac
 +++ b/opcodes/configure.ac
-@@ -195,10 +195,10 @@ if test "$enable_shared" = "yes"; then
+@@ -194,10 +194,10 @@ if test "$enable_shared" = "yes"; then
    case "${host}" in
      *-*-cygwin*)
        SHARED_LDFLAGS="-no-undefined"
@@ -80,5 +83,5 @@ index e31ddde9e57..8fdf538ecf8 100644
        ;;
    esac
 -- 
-2.49.1
+2.51.0
 

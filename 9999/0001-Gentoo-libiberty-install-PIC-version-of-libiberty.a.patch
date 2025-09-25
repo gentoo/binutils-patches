@@ -1,7 +1,8 @@
-From bd82239c2a628ace1b6fddcec96871641fadfbec Mon Sep 17 00:00:00 2001
+From 4ebcb339f9d678aef53596022a3e6125dfed109a Mon Sep 17 00:00:00 2001
+Message-ID: <4ebcb339f9d678aef53596022a3e6125dfed109a.1758805647.git.sam@gentoo.org>
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Fri, 7 Jan 2005 00:15:53 -0500
-Subject: [PATCH 1/5] Gentoo: libiberty: install PIC version of libiberty.a
+Subject: [PATCH 1/4] Gentoo: libiberty: install PIC version of libiberty.a
 
 This will install a PIC version of libiberty.a by overwriting the non-PIC
 version of libiberty.a while compiling.  We do this because there is no
@@ -30,5 +31,5 @@ index d507f27a9ef..51fefcb31c2 100644
  	else true; fi; \
  	if [ x"$(NOASANFLAG)" != x ]; then \
 -- 
-2.49.1
+2.51.0
 
