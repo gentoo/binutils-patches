@@ -1,25 +1,45 @@
-From 13058a8b8feb26ddafb62995f164d81dce02979c Mon Sep 17 00:00:00 2001
+From 6081e4356a0e4f9932a05af0871490fc54e15113 Mon Sep 17 00:00:00 2001
+Message-ID: <6081e4356a0e4f9932a05af0871490fc54e15113.1760143572.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
-Date: Thu, 9 Oct 2025 13:16:19 +0800
+Date: Sat, 11 Oct 2025 07:18:50 +0800
 Subject: [PATCH] elf: Cache full internal symbol table for relocatable input
 
-Cache internal symbol table for relocatable input and use the internal
-symbol table cache for both local and global symbols to avoid swapping in
-the same symbol table repeatedly for --gc-sections.  This improves linker
---gc-sections speed by ~20x.
+Add bfd_elf_get_elf_syms_cached to cache internal symbol table for
+relocatable input and use the internal symbol table cache for both local
+and global symbols to avoid swapping in the same symbol table repeatedly
+for --gc-sections.  This improves linker --gc-sections speed by ~2x for
+PR ld/33530.
 
-Most backends cache the local symbol table in symtab_hdr->contents. But
-some backends cache something else in it.  Since symtab_hdr->contents may
-point to the middle of the internal symbol table cache, we can release
-symtab_hdr->contents only when no backends cache the local symbol table
-in it.
+elf_link_input_bfd is updated to not to pass preallocated buffers to
+bfd_elf_get_elf_syms_cache.
+
+Data to link the 3.1GB clang executable in LLVM 21 debug build on
+Linux/x86-64 with 32GB RAM is:
+
+		before		after		improvement
+user		48.29		46.45		3.8%
+system		7.82		5.47		30%
+total		56.1 		51.92		7%
+maximum set(GB)	10.5		10.7		-0.2%
+page faults	2535779		2509896		0.1%
+
+and data to link the 308M cc1plus executable in GCC 16 stage 1 build is:
+
+		before		after		improvement
+user		3.56 		3.49		0.2%
+system		0.66		0.58		12%
+total		4.22 		4.07		0.3%
+maximum set(MB)	969		992		-2.4%
+page faults	992692		1016732		0.1%
 
 bfd/
 
 	PR ld/33530
-	* elf-bfd.h (elf_obj_tdata): Add symtab and keep_symtab.
+	* elf-bfd.h (elf_obj_tdata): Add symtab.
 	(bfd_elf_get_elf_syms): Remove the Elf_External_Sym_Shndx pointer
 	argument.
+	(bfd_elf_get_elf_syms_cached): New function.
+	(bfd_elf_free_symtab): Likewise.
 	* elf-eh-frame.c (adjust_eh_frame_local_symbols): Changed to
 	return void.
 	(_bfd_elf_discard_section_eh_frame): Updated.  Don't cache
@@ -30,6 +50,15 @@ bfd/
 	* elf-m10300.c (mn10300_elf_check_relocs): Likewise.
 	(mn10300_elf_relax_section): Likewise.
 	(mn10300_elf_get_relocated_section_contents): Likewise.
+	* elf.c (bfd_elf_get_elf_syms): Drop the Elf_External_Sym_Shndx
+	pointer argument.  Renamed to ...
+	(bfd_elf_get_elf_syms_cached):  This.  Cache internal symbol
+	table.
+	(bfd_elf_get_elf_syms): Call bfd_elf_get_elf_syms_cached.
+	(group_signature): Call bfd_elf_get_elf_syms_cached instead of
+	bfd_elf_get_elf_syms.
+	(bfd_sym_from_r_symndx): Likewise.
+	(_bfd_elf_free_cached_info): Free internal symbol table cache.
 	* elf32-arc.c (arc_elf_relax_section): Likewise.
 	* elf32-arm.c (cmse_scan): Likewise.
 	(elf32_arm_size_stubs): Likewise.
@@ -92,34 +121,25 @@ bfd/
 	(ppc64_elf_late_size_sections): Likewise.
 	(ppc64_elf_layout_multitoc): Likewise.
 	(got_and_plt_relr_for_local_syms): Likewise.
-	* elfnn-aarch64.c (_bfd_aarch64_add_call_stub_entries): Likewise.
-	(bfd_elfNN_aarch64_init_maps): Likewise.
-	* elfnn-ia64.c (elfNN_ia64_relax_section): Likewise.
-	* elfnn-kvx.c (elfNN_kvx_size_stubs): Likewise.
-	* elfnn-loongarch.c (_bfd_riscv_relax_section): Likewise.
-	* elfxx-mips.c (_bfd_mips_elf_relax_section): Likewise.
-	* elf.c (bfd_elf_get_elf_syms): Drop the Elf_External_Sym_Shndx
-	pointer argument.  Only allow the full external symbol table.
-	Cache internal symbol table.
-	(group_signature): Update the bfd_elf_get_elf_syms call.
-	(bfd_sym_from_r_symndx): Likewise.
-	(_bfd_elf_free_cached_info): Free internal symbol table cache.
-	* elfcode.h (elf_slurp_symbol_table): Don't free internal symbol
-	buffer.
-	* elflink.c (bfd_elf_link_record_local_dynamic_symbol): Update
-	the bfd_elf_get_elf_syms call.
-	(elf_link_is_defined_archive_symbol): Likewise.  Free cached
-	internal symbol buffer unless it should be kept.
-	(elf_link_add_object_symbols): Update the bfd_elf_get_elf_syms
-	call.  Free cached internal symbol buffer.
-	(bfd_elf_match_symbols_in_sections): Update the
-	bfd_elf_get_elf_syms call.  Don't free the internal symbol table.
+	* elfcode.h (elf_slurp_symbol_table): Call
+	bfd_elf_get_elf_syms_cached instead of bfd_elf_get_elf_syms.
+	Don't free internal symbol buffer.
+	* elflink.c (bfd_elf_link_record_local_dynamic_symbol): Call
+	bfd_elf_get_elf_syms_cached instead of bfd_elf_get_elf_syms.
+	(elf_link_is_defined_archive_symbol): Likewise.  Free internal
+	symbol table cache.
+	(elf_link_add_object_symbols): Call bfd_elf_get_elf_syms_cached
+	instead of bfd_elf_get_elf_syms.  Free internal symbol table
+	cache if it has been changed.
+	(bfd_elf_match_symbols_in_sections): Call
+	bfd_elf_get_elf_syms_cached instead of bfd_elf_get_elf_syms.
+	Don't free the internal symbol table.
 	(elf_final_link_info): Remove external_syms, locsym_shndx and
 	internal_syms.
-	(elf_link_check_versioned_symbol): Update the bfd_elf_get_elf_syms
-	call.
-	(elf_link_input_bfd): Likewise.  Don't use symtab_hdr->contents
-	for internal symbol table.
+	(elf_link_check_versioned_symbol): Call
+	bfd_elf_get_elf_syms_cached instead of bfd_elf_get_elf_syms.
+	(elf_link_input_bfd): Likewise.  Don't pass pre-allocated
+	buffer to bfd_elf_get_elf_syms_cached.
 	(elf_final_link_free): Updated.
 	(bfd_elf_final_link): Don't set flinfo.external_syms,
 	flinfo.internal_syms nor flinfo.locsym_shndx.
@@ -135,6 +155,12 @@ bfd/
 	(bfd_elf_discard_info): Replace fini_reloc_cookie_for_section with
 	fini_reloc_cookie_rels.  Don't call fini_reloc_cookie.
 	(bfd_elf_parse_eh_frame_entries): Updated.
+	* elfnn-aarch64.c (_bfd_aarch64_add_call_stub_entries): Likewise.
+	(bfd_elfNN_aarch64_init_maps): Likewise.
+	* elfnn-ia64.c (elfNN_ia64_relax_section): Likewise.
+	* elfnn-kvx.c (elfNN_kvx_size_stubs): Likewise.
+	* elfnn-loongarch.c (_bfd_riscv_relax_section): Likewise.
+	* elfxx-mips.c (_bfd_mips_elf_relax_section): Likewise.
 	* elfxx-x86.c (_bfd_x86_elf_link_relax_section): Don't use
 	use symtab_hdr->contents for internal symbol table.  Set
 	keep_symtab if the symbol table has been updated.
@@ -142,19 +168,20 @@ bfd/
 libctf/
 
 	PR ld/33530
-	* ctf-open-bfd.c (ctf_bfdopen_ctfsect): Free internal symbol
-	table cache.
+	* ctf-open-bfd.c (ctf_bfdopen_ctfsect): Call
+	bfd_elf_get_elf_syms_cached instead of bfd_elf_get_elf_syms.
+	Free internal symbol table cache.
 
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
- bfd/elf-bfd.h          |  11 ++-
- bfd/elf-eh-frame.c     |  17 ++---
+ bfd/elf-bfd.h          |  19 ++++-
+ bfd/elf-eh-frame.c     |  17 +----
  bfd/elf-m10200.c       |   4 +-
  bfd/elf-m10300.c       |  10 +--
- bfd/elf.c              | 131 ++++++++++++++++++++++++++---------
+ bfd/elf.c              | 167 +++++++++++++++++++++++++++++++----------
  bfd/elf32-arc.c        |   2 +-
  bfd/elf32-arm.c        |   7 +-
- bfd/elf32-avr.c        |  12 ++--
+ bfd/elf32-avr.c        |  12 +--
  bfd/elf32-bfin.c       |   2 +-
  bfd/elf32-cr16.c       |   6 +-
  bfd/elf32-crx.c        |   4 +-
@@ -164,7 +191,7 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  bfd/elf32-h8300.c      |   4 +-
  bfd/elf32-hppa.c       |   2 +-
  bfd/elf32-ip2k.c       |   2 +-
- bfd/elf32-m32c.c       |   8 ++-
+ bfd/elf32-m32c.c       |   8 +-
  bfd/elf32-m68hc11.c    |   2 +-
  bfd/elf32-m68hc1x.c    |   2 +-
  bfd/elf32-m68k.c       |   2 +-
@@ -185,21 +212,21 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  bfd/elf64-hppa.c       |   2 +-
  bfd/elf64-ia64-vms.c   |   4 +-
  bfd/elf64-mmix.c       |   2 +-
- bfd/elf64-ppc.c        |  12 ++--
- bfd/elfcode.h          |   8 +--
- bfd/elflink.c          | 152 ++++++++++++-----------------------------
+ bfd/elf64-ppc.c        |  12 +--
+ bfd/elfcode.h          |  10 +--
+ bfd/elflink.c          | 162 +++++++++++----------------------------
  bfd/elfnn-aarch64.c    |   4 +-
  bfd/elfnn-ia64.c       |   2 +-
  bfd/elfnn-kvx.c        |   2 +-
  bfd/elfnn-loongarch.c  |   2 +-
  bfd/elfnn-riscv.c      |   2 +-
  bfd/elfxx-mips.c       |   2 +-
- bfd/elfxx-x86.c        |  24 +++----
- libctf/ctf-open-bfd.c  |   5 +-
- 49 files changed, 243 insertions(+), 262 deletions(-)
+ bfd/elfxx-x86.c        |  22 ++++--
+ libctf/ctf-open-bfd.c  |   6 +-
+ 49 files changed, 293 insertions(+), 267 deletions(-)
 
 diff --git a/bfd/elf-bfd.h b/bfd/elf-bfd.h
-index 5d19529d972..b7061e55b59 100644
+index 5d19529d972..b0bd8f4d589 100644
 --- a/bfd/elf-bfd.h
 +++ b/bfd/elf-bfd.h
 @@ -2165,6 +2165,11 @@ struct elf_obj_tdata
@@ -214,26 +241,34 @@ index 5d19529d972..b7061e55b59 100644
    /* List of GNU properties.  Will be updated by setup_gnu_properties
       after all input GNU properties are merged for output.  */
    elf_property_list *properties;
-@@ -2207,6 +2212,9 @@ struct elf_obj_tdata
-      symbols.  */
-   unsigned int bad_symtab : 1;
- 
-+  /* Set if the symbol table cache should be kept.  */
-+  unsigned int keep_symtab : 1;
-+
-   /* Set if DT_FLAGS_1 has DF_1_PIE set.  */
-   unsigned int is_pie : 1;
- 
-@@ -2297,8 +2305,7 @@ extern unsigned int _bfd_elf_section_from_bfd_section
+@@ -2297,8 +2302,9 @@ extern unsigned int _bfd_elf_section_from_bfd_section
  extern char *bfd_elf_string_from_elf_section
    (bfd *, unsigned, unsigned);
  extern Elf_Internal_Sym *bfd_elf_get_elf_syms
 -  (bfd *, Elf_Internal_Shdr *, size_t, size_t, Elf_Internal_Sym *, void *,
 -   Elf_External_Sym_Shndx *);
 +  (bfd *, Elf_Internal_Shdr *, size_t, size_t, Elf_Internal_Sym *, void *);
++extern Elf_Internal_Sym *bfd_elf_get_elf_syms_cached
++  (bfd *, Elf_Internal_Shdr *, size_t, size_t, Elf_Internal_Sym *, void *);
  extern char * bfd_elf_get_str_section (bfd *, unsigned int);
  extern const char *bfd_elf_sym_name
    (bfd *, Elf_Internal_Shdr *, Elf_Internal_Sym *, asection *);
+@@ -3333,6 +3339,15 @@ bfd_section_is_ctf (const asection *sec)
+   return startswith (name, ".ctf") && (name[4] == 0 || name[4] == '.');
+ }
+ 
++/* Free ELF symbol table cache.  */
++
++static inline void
++bfd_elf_free_symtab (bfd *abfd)
++{
++  free (elf_tdata (abfd)->symtab);
++  elf_tdata (abfd)->symtab = NULL;
++}
++
+ #ifdef __cplusplus
+ }
+ #endif
 diff --git a/bfd/elf-eh-frame.c b/bfd/elf-eh-frame.c
 index 4eda3c991bb..bd2c85291fb 100644
 --- a/bfd/elf-eh-frame.c
@@ -353,7 +388,7 @@ index b381bb9037c..373290cbe4a 100644
  	    goto error_return;
  	}
 diff --git a/bfd/elf.c b/bfd/elf.c
-index bde7414ee21..9e220f0a0d7 100644
+index bde7414ee21..472fb5da55e 100644
 --- a/bfd/elf.c
 +++ b/bfd/elf.c
 @@ -428,21 +428,20 @@ bfd_elf_string_from_elf_section (bfd *abfd,
@@ -369,20 +404,23 @@ index bde7414ee21..9e220f0a0d7 100644
 -   Returns a pointer to the internal symbol buffer (malloced if necessary)
 -   or NULL if there were no symbols or some kind of problem.  */
 +   symbols, and symbol section index extensions, respectively.  Returns
-+   a pointer to the internal symbol buffer (malloced if necessary) or
-+   NULL if there were no symbols or some kind of problem.  */
++   a pointer to the internal symbol cache or NULL if there were no
++   symbols or some kind of problem.  */
  
  Elf_Internal_Sym *
- bfd_elf_get_elf_syms (bfd *ibfd,
- 		      Elf_Internal_Shdr *symtab_hdr,
+-bfd_elf_get_elf_syms (bfd *ibfd,
+-		      Elf_Internal_Shdr *symtab_hdr,
 -		      size_t symcount,
 -		      size_t symoffset,
-+		      size_t partial_symcount,
-+		      size_t partial_symoffset,
- 		      Elf_Internal_Sym *intsym_buf,
+-		      Elf_Internal_Sym *intsym_buf,
 -		      void *extsym_buf,
 -		      Elf_External_Sym_Shndx *extshndx_buf)
-+		      void *partial_extsym_buf)
++bfd_elf_get_elf_syms_cached (bfd *ibfd,
++			     Elf_Internal_Shdr *symtab_hdr,
++			     size_t partial_symcount,
++			     size_t partial_symoffset,
++			     Elf_Internal_Sym *intsym_buf,
++			     void *partial_extsym_buf)
  {
    Elf_Internal_Shdr *shndx_hdr;
    void *alloc_ext;
@@ -400,30 +438,33 @@ index bde7414ee21..9e220f0a0d7 100644
  
    if (bfd_get_flavour (ibfd) != bfd_target_elf_flavour)
      abort ();
-@@ -474,6 +478,22 @@ bfd_elf_get_elf_syms (bfd *ibfd,
+@@ -474,6 +478,25 @@ bfd_elf_get_elf_syms (bfd *ibfd,
        return elf_tdata (ibfd)->dt_symtab + symoffset;
      }
  
 +  if (elf_tdata (ibfd)->symtab != NULL)
 +    {
-+      /* NB: Should extsym_buf be cached?  */
++      /* Since extsym_buf isn't cached, free the symbol table cache and
++	 re-read the symbol table.  */
 +      if (partial_extsym_buf != NULL)
-+	abort ();
-+
-+      if (intsym_buf != NULL)
-+	{
-+	  memcpy (intsym_buf, elf_tdata (ibfd)->symtab + symoffset,
-+		  symcount * sizeof (*intsym_buf));
-+	  return intsym_buf;
-+	}
++	bfd_elf_free_symtab (ibfd);
 +      else
-+	return elf_tdata (ibfd)->symtab + symoffset;
++	{
++	  if (intsym_buf != NULL)
++	    {
++	      memcpy (intsym_buf, elf_tdata (ibfd)->symtab + symoffset,
++		      symcount * sizeof (*intsym_buf));
++	      return intsym_buf;
++	    }
++	  else
++	    return elf_tdata (ibfd)->symtab + symoffset;
++	}
 +    }
 +
    /* Normal syms might have section extension entries.  */
    shndx_hdr = NULL;
    if (elf_symtab_shndx_list (ibfd) != NULL)
-@@ -506,19 +526,31 @@ bfd_elf_get_elf_syms (bfd *ibfd,
+@@ -506,19 +529,31 @@ bfd_elf_get_elf_syms (bfd *ibfd,
  	}
      }
  
@@ -458,7 +499,7 @@ index bde7414ee21..9e220f0a0d7 100644
    if (bfd_seek (ibfd, pos, SEEK_SET) != 0
        || !_bfd_mmap_read_temporary (&extsym_buf, &alloc_ext_size,
  				    &alloc_ext, ibfd, false))
-@@ -551,22 +583,24 @@ bfd_elf_get_elf_syms (bfd *ibfd,
+@@ -551,22 +586,24 @@ bfd_elf_get_elf_syms (bfd *ibfd,
  	}
      }
  
@@ -476,17 +517,17 @@ index bde7414ee21..9e220f0a0d7 100644
 -	goto out1;
 +      bfd_set_error (bfd_error_file_too_big);
 +      goto out1;
-     }
++    }
 +  alloc_intsym = (Elf_Internal_Sym *) bfd_malloc (amt);
 +  if (alloc_intsym == NULL)
 +    {
 +      intsym_buf = NULL;
 +      goto out1;
-+    }
-+
+     }
+ 
 +  if (intsym_buf == NULL)
 +    intsym_buf = alloc_intsym;
- 
++
    /* Convert the symbols to internal form.  */
 -  isymend = intsym_buf + symcount;
 -  for (esym = (const bfd_byte *) extsym_buf, isym = intsym_buf,
@@ -495,7 +536,7 @@ index bde7414ee21..9e220f0a0d7 100644
  	   shndx = extshndx_buf;
         isym < isymend;
         esym += extsym_size, isym++, shndx = shndx != NULL ? shndx + 1 : NULL)
-@@ -590,7 +624,9 @@ bfd_elf_get_elf_syms (bfd *ibfd,
+@@ -590,7 +627,9 @@ bfd_elf_get_elf_syms (bfd *ibfd,
  	{	
  	  /* xgettext:c-format */
  	  _bfd_error_handler (_("%pB symbol number %lu uses unsupported binding of %u"),
@@ -506,7 +547,7 @@ index bde7414ee21..9e220f0a0d7 100644
  	  free (alloc_intsym);
  	  intsym_buf = NULL;
  	  goto out1;
-@@ -602,19 +638,42 @@ bfd_elf_get_elf_syms (bfd *ibfd,
+@@ -602,18 +641,72 @@ bfd_elf_get_elf_syms (bfd *ibfd,
  	{
  	  /* xgettext:c-format */
  	  _bfd_error_handler (_("%pB symbol number %lu uses unsupported type of %u"),
@@ -520,23 +561,19 @@ index bde7414ee21..9e220f0a0d7 100644
  	}
      }
  
++  /* Copy external symbol table before external symbol table buffer
++     is released by _bfd_munmap_temporary.  */
 +  if (intsym_buf != NULL && partial_extsym_buf != NULL)
-+    {
-+      if (partial_symcount != symcount)
-+	abort ();
-+      memcpy (partial_extsym_buf, extsym_buf, extsym_buf_size);
-+    }
++    memcpy (partial_extsym_buf,
++	    extsym_buf + partial_symoffset * extsym_size,
++	    partial_symcount * extsym_size);
 +
   out1:
    _bfd_munmap_temporary (alloc_extshndx, alloc_extshndx_size);
   out2:
    _bfd_munmap_temporary (alloc_ext, alloc_ext_size);
  
--  return intsym_buf;
-+  if (intsym_buf == NULL)
-+    return intsym_buf;
-+
-+  if (!cache_symtab)
++  if (intsym_buf == NULL || !cache_symtab)
 +    return intsym_buf;
 +
 +  elf_tdata (ibfd)->symtab = alloc_intsym;
@@ -548,10 +585,43 @@ index bde7414ee21..9e220f0a0d7 100644
 +    }
 +  else
 +    return alloc_intsym + partial_symoffset;
++}
++
++/* Read and convert symbols to internal format.
++   PARTIAL_SYMCOUNT specifies the number of symbols to read, starting
++   from symbol PARTIAL_SYMOFFSET.  If INTSYM_BUF or PARTIAL_EXTSYM_BUF
++   are non-NULL, they are used to store the internal symbols, external
++   symbols, and symbol section index extensions, respectively.  Returns
++   a pointer to the internal symbol buffer (malloced if necessary) or
++   NULL if there were no symbols or some kind of problem.  */
++
++Elf_Internal_Sym *
++bfd_elf_get_elf_syms (bfd *ibfd,
++		      Elf_Internal_Shdr *symtab_hdr,
++		      size_t partial_symcount,
++		      size_t partial_symoffset,
++		      Elf_Internal_Sym *intsym_buf,
++		      void *partial_extsym_buf)
++{
++  Elf_Internal_Sym *isym
++    = bfd_elf_get_elf_syms_cached (ibfd, symtab_hdr, partial_symcount,
++				   partial_symoffset, intsym_buf,
++				   partial_extsym_buf);
++  if (isym == NULL
++      || intsym_buf != NULL
++      || partial_symcount == 0
++      || elf_use_dt_symtab_p (ibfd))
++    return isym;
++
++  size_t amt = partial_symcount * sizeof (*intsym_buf);
++  intsym_buf = bfd_malloc (amt);
++  if (intsym_buf != NULL)
++    memcpy (intsym_buf, isym, amt);
++  bfd_elf_free_symtab (ibfd);
+   return intsym_buf;
  }
  
- /* Look up a symbol name.  */
-@@ -659,8 +718,6 @@ static const char *
+@@ -659,8 +752,6 @@ static const char *
  group_signature (bfd *abfd, Elf_Internal_Shdr *ghdr)
  {
    Elf_Internal_Shdr *hdr;
@@ -560,16 +630,18 @@ index bde7414ee21..9e220f0a0d7 100644
    Elf_Internal_Sym isym;
  
    /* First we need to ensure the symbol table is available.  Make sure
-@@ -675,7 +732,7 @@ group_signature (bfd *abfd, Elf_Internal_Shdr *ghdr)
+@@ -674,8 +765,8 @@ group_signature (bfd *abfd, Elf_Internal_Shdr *ghdr)
+ 
    /* Go read the symbol.  */
    hdr = &elf_tdata (abfd)->symtab_hdr;
-   if (bfd_elf_get_elf_syms (abfd, hdr, 1, ghdr->sh_info,
+-  if (bfd_elf_get_elf_syms (abfd, hdr, 1, ghdr->sh_info,
 -			    &isym, esym, &eshndx) == NULL)
-+			    &isym, NULL) == NULL)
++  if (bfd_elf_get_elf_syms_cached (abfd, hdr, 1, ghdr->sh_info,
++				   &isym, NULL) == NULL)
      return NULL;
  
    return bfd_elf_sym_name_raw (abfd, hdr, &isym);
-@@ -3029,12 +3086,10 @@ bfd_sym_from_r_symndx (struct sym_cache *cache,
+@@ -3029,12 +3120,10 @@ bfd_sym_from_r_symndx (struct sym_cache *cache,
    if (cache->abfd != abfd || cache->indx[ent] != r_symndx)
      {
        Elf_Internal_Shdr *symtab_hdr;
@@ -577,24 +649,17 @@ index bde7414ee21..9e220f0a0d7 100644
 -      Elf_External_Sym_Shndx eshndx;
  
        symtab_hdr = &elf_tdata (abfd)->symtab_hdr;
-       if (bfd_elf_get_elf_syms (abfd, symtab_hdr, 1, r_symndx,
+-      if (bfd_elf_get_elf_syms (abfd, symtab_hdr, 1, r_symndx,
 -				&cache->sym[ent], esym, &eshndx) == NULL)
-+				&cache->sym[ent], NULL) == NULL)
++      if (bfd_elf_get_elf_syms_cached (abfd, symtab_hdr, 1, r_symndx,
++				       &cache->sym[ent], NULL) == NULL)
  	return NULL;
  
        if (cache->abfd != abfd)
-@@ -10239,8 +10294,16 @@ _bfd_elf_free_cached_info (bfd *abfd)
- 	      free (sec_info->cies);
- 	    }
+@@ -10241,6 +10330,8 @@ _bfd_elf_free_cached_info (bfd *abfd)
  	}
-+#if 0
-+      /* NB: tdata->symtab_hdr.contents may point to the middle of
-+	 tdata->symtab.  Need to update all backends only to cache
-+	 the malloced memory in tdata->symtab_hdr.contents before
-+	 tdata->symtab_hdr.contents can be freed.  */
        free (tdata->symtab_hdr.contents);
        tdata->symtab_hdr.contents = NULL;
-+#endif
 +      free (tdata->symtab);
 +      tdata->symtab = NULL;
      }
@@ -1307,15 +1372,17 @@ index fdda9e0bbb3..ee15d6f0639 100644
  	    return false;
  	}
 diff --git a/bfd/elfcode.h b/bfd/elfcode.h
-index 5224a1abee6..8777a08a77a 100644
+index 5224a1abee6..f8176294bc9 100644
 --- a/bfd/elfcode.h
 +++ b/bfd/elfcode.h
-@@ -1303,7 +1303,7 @@ elf_slurp_symbol_table (bfd *abfd, asymbol **symptrs, bool dynamic)
+@@ -1302,8 +1302,8 @@ elf_slurp_symbol_table (bfd *abfd, asymbol **symptrs, bool dynamic)
+     {
        size_t i;
  
-       isymbuf = bfd_elf_get_elf_syms (abfd, hdr, symcount, 0,
+-      isymbuf = bfd_elf_get_elf_syms (abfd, hdr, symcount, 0,
 -				      NULL, NULL, NULL);
-+				      NULL, NULL);
++      isymbuf = bfd_elf_get_elf_syms_cached (abfd, hdr, symcount, 0,
++					     NULL, NULL);
        if (isymbuf == NULL)
  	return -1;
  
@@ -1337,7 +1404,7 @@ index 5224a1abee6..8777a08a77a 100644
  }
  
 diff --git a/bfd/elflink.c b/bfd/elflink.c
-index 3f3ea2cce51..da4da5c453a 100644
+index 3f3ea2cce51..0ab843a4924 100644
 --- a/bfd/elflink.c
 +++ b/bfd/elflink.c
 @@ -851,8 +851,6 @@ bfd_elf_link_record_local_dynamic_symbol (struct bfd_link_info *info,
@@ -1349,89 +1416,119 @@ index 3f3ea2cce51..da4da5c453a 100644
  
    if (! is_elf_hash_table (info->hash))
      return 0;
-@@ -869,7 +867,7 @@ bfd_elf_link_record_local_dynamic_symbol (struct bfd_link_info *info,
+@@ -868,8 +866,9 @@ bfd_elf_link_record_local_dynamic_symbol (struct bfd_link_info *info,
+     return 0;
  
    /* Go find the symbol, so that we can find it's name.  */
-   if (!bfd_elf_get_elf_syms (input_bfd, &elf_tdata (input_bfd)->symtab_hdr,
+-  if (!bfd_elf_get_elf_syms (input_bfd, &elf_tdata (input_bfd)->symtab_hdr,
 -			     1, input_indx, &entry->isym, esym, &eshndx))
-+			     1, input_indx, &entry->isym, NULL))
++  if (!bfd_elf_get_elf_syms_cached (input_bfd,
++				    &elf_tdata (input_bfd)->symtab_hdr,
++				    1, input_indx, &entry->isym, NULL))
      {
        bfd_release (input_bfd, entry);
        return 0;
-@@ -3745,7 +3743,7 @@ elf_link_is_defined_archive_symbol (bfd * abfd, carsym * symdef)
+@@ -3744,8 +3743,8 @@ elf_link_is_defined_archive_symbol (bfd * abfd, carsym * symdef)
+     return false;
  
    /* Read in the symbol table.  */
-   isymbuf = bfd_elf_get_elf_syms (abfd, hdr, extsymcount, extsymoff,
+-  isymbuf = bfd_elf_get_elf_syms (abfd, hdr, extsymcount, extsymoff,
 -				  NULL, NULL, NULL);
-+				  NULL, NULL);
++  isymbuf = bfd_elf_get_elf_syms_cached (abfd, hdr, extsymcount,
++					 extsymoff, NULL, NULL);
    if (isymbuf == NULL)
      return false;
  
-@@ -3767,7 +3765,11 @@ elf_link_is_defined_archive_symbol (bfd * abfd, carsym * symdef)
+@@ -3767,7 +3766,7 @@ elf_link_is_defined_archive_symbol (bfd * abfd, carsym * symdef)
  	}
      }
  
 -  free (isymbuf);
-+  if (!elf_tdata (abfd)->keep_symtab)
-+    {
-+      free (elf_tdata (abfd)->symtab);
-+      elf_tdata (abfd)->symtab = NULL;
-+    }
++  bfd_elf_free_symtab (abfd);
  
    return result;
  }
-@@ -4830,7 +4832,7 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
+@@ -4829,8 +4828,8 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
+   sym_hash = elf_sym_hashes (abfd);
    if (extsymcount != 0)
      {
-       isymbuf = bfd_elf_get_elf_syms (abfd, hdr, extsymcount, extsymoff,
+-      isymbuf = bfd_elf_get_elf_syms (abfd, hdr, extsymcount, extsymoff,
 -				      NULL, NULL, NULL);
-+				      NULL, NULL);
++      isymbuf = bfd_elf_get_elf_syms_cached (abfd, hdr, extsymcount,
++					     extsymoff, NULL, NULL);
        if (isymbuf == NULL)
  	goto error_return;
  
-@@ -5814,8 +5816,11 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
+@@ -4977,6 +4976,8 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
+ 	(_("%pB: plugin needed to handle lto object"), abfd);
+     }
+ 
++  bool symtab_changed = false;
++
+   for (isym = isymbuf, isymend = PTR_ADD (isymbuf, extsymcount);
+        isym < isymend;
+        isym++, sym_hash++, ever = (ever != NULL ? ever + 1 : NULL))
+@@ -5013,6 +5014,7 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
+ 	{
+ 	  /* Treat common symbol as undefined for --no-define-common.  */
+ 	  isym->st_shndx = SHN_UNDEF;
++	  symtab_changed = true;
+ 	  common = false;
+ 	}
+       discarded = false;
+@@ -5086,6 +5088,7 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
+ 	      sec = bfd_und_section_ptr;
+ 	      discarded = true;
+ 	      isym->st_shndx = SHN_UNDEF;
++	      symtab_changed = true;
+ 	    }
+ 	  else if ((abfd->flags & (EXEC_P | DYNAMIC)) != 0)
+ 	    value -= sec->vma;
+@@ -5814,8 +5817,10 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
  
    free (extversym);
    extversym = NULL;
 -  free (isymbuf);
 -  isymbuf = NULL;
 +
-+  /* NB: Since st_shndx of symbol from discarded section is changed to
-+     SHN_UNDEF, free the cached symbol table.  */
-+  free (elf_tdata (abfd)->symtab);
-+  elf_tdata (abfd)->symtab = NULL;
++  /* Free internal symbol table cache if it has been changed.  */
++  if (symtab_changed)
++    bfd_elf_free_symtab (abfd);
  
    if ((elf_dyn_lib_class (abfd) & DYN_AS_NEEDED) != 0)
      {
-@@ -6167,7 +6172,8 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
+@@ -6167,7 +6172,7 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
    free (nondeflt_vers);
    free (extversym);
   error_free_sym:
 -  free (isymbuf);
-+  free (elf_tdata (abfd)->symtab);
-+  elf_tdata (abfd)->symtab = NULL;
++  bfd_elf_free_symtab (abfd);
   error_return:
    return false;
  }
-@@ -8809,7 +8815,7 @@ bfd_elf_match_symbols_in_sections (asection *sec1, asection *sec2,
+@@ -8808,8 +8813,8 @@ bfd_elf_match_symbols_in_sections (asection *sec1, asection *sec2,
+ 
    if (ssymbuf1 == NULL)
      {
-       isymbuf1 = bfd_elf_get_elf_syms (bfd1, hdr1, symcount1, 0,
+-      isymbuf1 = bfd_elf_get_elf_syms (bfd1, hdr1, symcount1, 0,
 -				       NULL, NULL, NULL);
-+				       NULL, NULL);
++      isymbuf1 = bfd_elf_get_elf_syms_cached (bfd1, hdr1, symcount1,
++					      0, NULL, NULL);
        if (isymbuf1 == NULL)
  	goto done;
  
-@@ -8823,7 +8829,7 @@ bfd_elf_match_symbols_in_sections (asection *sec1, asection *sec2,
+@@ -8822,8 +8827,8 @@ bfd_elf_match_symbols_in_sections (asection *sec1, asection *sec2,
+ 
    if (ssymbuf1 == NULL || ssymbuf2 == NULL)
      {
-       isymbuf2 = bfd_elf_get_elf_syms (bfd2, hdr2, symcount2, 0,
+-      isymbuf2 = bfd_elf_get_elf_syms (bfd2, hdr2, symcount2, 0,
 -				       NULL, NULL, NULL);
-+				       NULL, NULL);
++      isymbuf2 = bfd_elf_get_elf_syms_cached (bfd2, hdr2, symcount2,
++					      0, NULL, NULL);
        if (isymbuf2 == NULL)
  	goto done;
  
-@@ -9013,8 +9019,6 @@ bfd_elf_match_symbols_in_sections (asection *sec1, asection *sec2,
+@@ -9013,8 +9018,6 @@ bfd_elf_match_symbols_in_sections (asection *sec1, asection *sec2,
   done:
    free (symtable1);
    free (symtable2);
@@ -1440,7 +1537,7 @@ index 3f3ea2cce51..da4da5c453a 100644
  
    return result;
  }
-@@ -9056,14 +9060,6 @@ struct elf_final_link_info
+@@ -9056,14 +9059,6 @@ struct elf_final_link_info
    void *external_relocs;
    /* Buffer large enough to hold internal relocs of any section.  */
    Elf_Internal_Rela *internal_relocs;
@@ -1455,16 +1552,18 @@ index 3f3ea2cce51..da4da5c453a 100644
    /* Array large enough to hold a symbol index for each local symbol
       of any input BFD.  */
    long *indices;
-@@ -10666,7 +10662,7 @@ elf_link_check_versioned_symbol (struct bfd_link_info *info,
+@@ -10665,8 +10660,8 @@ elf_link_check_versioned_symbol (struct bfd_link_info *info,
+       if (extsymcount == 0)
  	continue;
  
-       isymbuf = bfd_elf_get_elf_syms (input, hdr, extsymcount, extsymoff,
+-      isymbuf = bfd_elf_get_elf_syms (input, hdr, extsymcount, extsymoff,
 -				      NULL, NULL, NULL);
-+				      NULL, NULL);
++      isymbuf = bfd_elf_get_elf_syms_cached (input, hdr, extsymcount,
++					     extsymoff, NULL, NULL);
        if (isymbuf == NULL)
  	return false;
  
-@@ -11410,7 +11406,7 @@ elf_link_input_bfd (struct elf_final_link_info *flinfo, bfd *input_bfd)
+@@ -11410,7 +11405,7 @@ elf_link_input_bfd (struct elf_final_link_info *flinfo, bfd *input_bfd)
    Elf_Internal_Shdr *symtab_hdr;
    size_t locsymcount;
    size_t extsymoff;
@@ -1473,19 +1572,16 @@ index 3f3ea2cce51..da4da5c453a 100644
    Elf_Internal_Sym *isym;
    Elf_Internal_Sym *isymend;
    long *pindex;
-@@ -11456,13 +11452,10 @@ elf_link_input_bfd (struct elf_final_link_info *flinfo, bfd *input_bfd)
- 	     ? -1 : ~elf_gnu_osabi_retain));
- 
-   /* Read the local symbols.  */
--  isymbuf = (Elf_Internal_Sym *) symtab_hdr->contents;
--  if (isymbuf == NULL && locsymcount != 0)
-+  if (locsymcount != 0)
+@@ -11459,10 +11454,8 @@ elf_link_input_bfd (struct elf_final_link_info *flinfo, bfd *input_bfd)
+   isymbuf = (Elf_Internal_Sym *) symtab_hdr->contents;
+   if (isymbuf == NULL && locsymcount != 0)
      {
-       isymbuf = bfd_elf_get_elf_syms (input_bfd, symtab_hdr, locsymcount, 0,
+-      isymbuf = bfd_elf_get_elf_syms (input_bfd, symtab_hdr, locsymcount, 0,
 -				      flinfo->internal_syms,
 -				      flinfo->external_syms,
 -				      flinfo->locsym_shndx);
-+				      NULL, NULL);
++      isymbuf = bfd_elf_get_elf_syms_cached (input_bfd, symtab_hdr,
++					     locsymcount, 0, NULL, NULL);
        if (isymbuf == NULL)
  	return false;
      }
@@ -1576,10 +1672,12 @@ index 3f3ea2cce51..da4da5c453a 100644
 -  if (cookie->locsyms == NULL && cookie->locsymcount != 0)
 +  if (cookie->locsymcount != 0)
      {
-       cookie->locsyms = bfd_elf_get_elf_syms (abfd, symtab_hdr,
- 					      cookie->locsymcount, 0,
+-      cookie->locsyms = bfd_elf_get_elf_syms (abfd, symtab_hdr,
+-					      cookie->locsymcount, 0,
 -					      NULL, NULL, NULL);
-+					      NULL, NULL);
++      cookie->locsyms = bfd_elf_get_elf_syms_cached (abfd, symtab_hdr,
++						     cookie->locsymcount,
++						     0, NULL, NULL);
        if (cookie->locsyms == NULL)
  	{
  	  info->callbacks->einfo (_("%P%X: can not read symbols: %E\n"));
@@ -1678,21 +1776,17 @@ index 3f3ea2cce51..da4da5c453a 100644
  	  sec = bfd_get_next_section_by_name (NULL, sec);
  	}
      }
-@@ -14784,6 +14711,13 @@ bfd_elf_gc_sections (bfd *abfd, struct bfd_link_info *info)
+@@ -14784,6 +14711,9 @@ bfd_elf_gc_sections (bfd *abfd, struct bfd_link_info *info)
  	    if (!_bfd_elf_gc_mark (info, o, gc_mark_hook))
  	      return false;
  	  }
 +
-+      if (!elf_tdata (sub)->keep_symtab
-+	  && !_bfd_elf_link_keep_memory (info))
-+	{
-+	  free (elf_tdata (sub)->symtab);
-+	  elf_tdata (sub)->symtab = NULL;
-+	}
++      if (!_bfd_elf_link_keep_memory (info))
++	bfd_elf_free_symtab (sub);
      }
  
    /* Allow the backend to mark additional target specific sections.  */
-@@ -15239,7 +15173,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
+@@ -15239,7 +15169,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
  					  &cookie))
  	    changed = 1;
  
@@ -1701,7 +1795,7 @@ index 3f3ea2cce51..da4da5c453a 100644
  	}
      }
  
-@@ -15274,7 +15208,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
+@@ -15274,7 +15204,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
  		changed = 1;
  	    }
  
@@ -1710,7 +1804,7 @@ index 3f3ea2cce51..da4da5c453a 100644
  	}
  
        eh_alignment = ((1 << o->alignment_power)
-@@ -15339,7 +15273,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
+@@ -15339,7 +15269,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
  		    changed = 1;
  		}
  	    }
@@ -1719,7 +1813,7 @@ index 3f3ea2cce51..da4da5c453a 100644
  	}
        /* Update the reference to the output .sframe section.  Used to
  	 determine later if PT_GNU_SFRAME segment is to be generated.  */
-@@ -15362,13 +15296,11 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
+@@ -15362,13 +15292,11 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
  
        if (bed->elf_backend_discard_info != NULL)
  	{
@@ -1822,64 +1916,66 @@ index 00ef0663728..44c58362dda 100644
  	    goto error_return;
  	}
 diff --git a/bfd/elfxx-x86.c b/bfd/elfxx-x86.c
-index 140e86888a6..53083e0b54c 100644
+index 140e86888a6..3f397f5cf70 100644
 --- a/bfd/elfxx-x86.c
 +++ b/bfd/elfxx-x86.c
-@@ -1154,15 +1154,11 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
- 	  /* Read this BFD's local symbols.  */
- 	  if (isymbuf == NULL)
- 	    {
--	      isymbuf = (Elf_Internal_Sym *) symtab_hdr->contents;
-+	      isymbuf = bfd_elf_get_elf_syms (abfd, symtab_hdr,
-+					      symtab_hdr->sh_info,
-+					      0, NULL, NULL);
+@@ -1157,9 +1157,10 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
+ 	      isymbuf = (Elf_Internal_Sym *) symtab_hdr->contents;
  	      if (isymbuf == NULL)
--		{
+ 		{
 -		  isymbuf = bfd_elf_get_elf_syms (abfd, symtab_hdr,
 -						  symtab_hdr->sh_info,
 -						  0, NULL, NULL, NULL);
--		  if (isymbuf == NULL)
--		    goto error_return;
--		}
-+		goto error_return;
- 	    }
- 
- 	  isym = isymbuf + r_symndx;
-@@ -1345,14 +1341,10 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
++		  isymbuf
++		    = bfd_elf_get_elf_syms_cached (abfd, symtab_hdr,
++						   symtab_hdr->sh_info,
++						   0, NULL, NULL);
+ 		  if (isymbuf == NULL)
+ 		    goto error_return;
+ 		}
+@@ -1345,13 +1346,18 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
    return_status = true;
  
  error_return:
 -  if ((unsigned char *) isymbuf != symtab_hdr->contents)
--    {
++  if (keep_symbuf && (unsigned char *) isymbuf != symtab_hdr->contents)
+     {
 -      /* Cache the symbol buffer if it must be kept.  */
 -      if (keep_symbuf)
 -	symtab_hdr->contents = (unsigned char *) isymbuf;
--      else
++      /* Cache the symbol buffer if it has been changed.  */
++      size_t amt = symtab_hdr->sh_info * sizeof (*isymbuf);
++      void *buffer = bfd_malloc (amt);
++      if (buffer == NULL)
++	return_status = false;
+       else
 -	free (isymbuf);
--    }
-+  /* If the symbol table has been updated, it must be kept since it will
-+     be used later.  */
-+  if (keep_symbuf)
-+    elf_tdata (abfd)->keep_symtab = 1;
++	{
++	  memcpy (buffer, isymbuf, amt);
++	  symtab_hdr->contents = buffer;
++	}
+     }
    if (elf_section_data (input_section)->relocs != internal_relocs)
      free (internal_relocs);
-   return return_status;
 diff --git a/libctf/ctf-open-bfd.c b/libctf/ctf-open-bfd.c
-index 7241de70709..205347c4e22 100644
+index 7241de70709..2ec91ffb0bf 100644
 --- a/libctf/ctf-open-bfd.c
 +++ b/libctf/ctf-open-bfd.c
-@@ -146,8 +146,9 @@ ctf_bfdopen_ctfsect (struct bfd *abfd _libctf_unused_,
+@@ -145,9 +145,9 @@ ctf_bfdopen_ctfsect (struct bfd *abfd _libctf_unused_,
+ 	  goto err;
  	}
  
-       isymbuf = bfd_elf_get_elf_syms (abfd, symhdr, symcount, 0,
+-      isymbuf = bfd_elf_get_elf_syms (abfd, symhdr, symcount, 0,
 -				      NULL, symtab, NULL);
 -      free (isymbuf);
-+				      NULL, symtab);
-+      free (elf_tdata (abfd)->symtab);
-+      elf_tdata (abfd)->symtab = NULL;
++      isymbuf = bfd_elf_get_elf_syms_cached (abfd, symhdr, symcount, 0,
++					     NULL, symtab);
++      bfd_elf_free_symtab (abfd);
        if (isymbuf == NULL)
  	{
  	  bfderrstr = N_("cannot read symbol table");
+
+base-commit: 552ddbabb5d28b301c660ddeecae19510ed4aa30
 -- 
-GitLab
+2.51.0
 
