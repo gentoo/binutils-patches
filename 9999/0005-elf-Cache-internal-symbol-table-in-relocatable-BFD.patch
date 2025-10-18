@@ -1,8 +1,8 @@
-From 9cf16688a03d54c4788398d9481d798935a71d40 Mon Sep 17 00:00:00 2001
+From cc559d319379dc169fa2e4bce2c584b2684e1c90 Mon Sep 17 00:00:00 2001
+Message-ID: <cc559d319379dc169fa2e4bce2c584b2684e1c90.1760774616.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Thu, 9 Oct 2025 13:16:19 +0800
-Subject: [PATCH v2] elf: Cache full internal symbol table for relocatable
- input
+Subject: [PATCH] elf: Cache full internal symbol table for relocatable input
 
 Add bfd_elf_get_elf_syms_cached to cache internal symbol table for
 relocatable input and use the internal symbol table cache for both local
@@ -80,18 +80,6 @@ bfd/
 	(bfd_elf_final_link): Don't clear flinfo fields after cleared
 	with memset.  Don't set flinfo.external_syms,
 	flinfo.internal_syms nor flinfo.locsym_shndx.
-	(init_reloc_cookie): Remove the keep_memory argument.  Don't
-	cache internal symbol table in symtab_hdr.
-	(fini_reloc_cookie): Removed.
-	(init_reloc_cookie_for_section): Don't call fini_reloc_cookie on
-	error.
-	(_bfd_elf_gc_mark): Replace fini_reloc_cookie_for_section with
-	fini_reloc_cookie_rels.
-	(bfd_elf_gc_sections): Likewise.  Free the internal symbol table
-	cache.
-	(bfd_elf_discard_info): Replace fini_reloc_cookie_for_section with
-	fini_reloc_cookie_rels.  Don't call fini_reloc_cookie.
-	(bfd_elf_parse_eh_frame_entries): Updated.
 	* elfxx-x86.c (_bfd_x86_elf_link_relax_section): Call
 	bfd_elf_get_elf_syms_cached instead of bfd_elf_get_elf_syms.
 	Cache internal symbol table in symtab_hdr->contents if it has
@@ -110,10 +98,10 @@ Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
  bfd/elf-eh-frame.c    |  17 +---
  bfd/elf.c             | 189 +++++++++++++++++++++++++++++++++---------
  bfd/elfcode.h         |  10 +--
- bfd/elflink.c         | 172 +++++++++++---------------------------
+ bfd/elflink.c         |  95 +++++++--------------
  bfd/elfxx-x86.c       |  22 +++--
  libctf/ctf-open-bfd.c |   6 +-
- 7 files changed, 239 insertions(+), 194 deletions(-)
+ 7 files changed, 219 insertions(+), 137 deletions(-)
 
 diff --git a/bfd/elf-bfd.h b/bfd/elf-bfd.h
 index 5d19529d972..28179647e9d 100644
@@ -536,7 +524,7 @@ index 5224a1abee6..ae5e814cdcc 100644
  }
  
 diff --git a/bfd/elflink.c b/bfd/elflink.c
-index 3f3ea2cce51..1566dcbb677 100644
+index 3f3ea2cce51..1259bd20f94 100644
 --- a/bfd/elflink.c
 +++ b/bfd/elflink.c
 @@ -851,8 +851,6 @@ bfd_elf_link_record_local_dynamic_symbol (struct bfd_link_info *info,
@@ -795,181 +783,6 @@ index 3f3ea2cce51..1566dcbb677 100644
    if (htab->tls_sec)
      {
        bfd_vma base, end = 0;  /* Both bytes.  */
-@@ -13890,8 +13855,7 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
- 
- static bool
- init_reloc_cookie (struct elf_reloc_cookie *cookie,
--		   struct bfd_link_info *info, bfd *abfd,
--		   bool keep_memory)
-+		   struct bfd_link_info *info, bfd *abfd)
- {
-   Elf_Internal_Shdr *symtab_hdr;
-   const struct elf_backend_data *bed;
-@@ -13918,39 +13882,21 @@ init_reloc_cookie (struct elf_reloc_cookie *cookie,
-   else
-     cookie->r_sym_shift = 32;
- 
--  cookie->locsyms = (Elf_Internal_Sym *) symtab_hdr->contents;
--  if (cookie->locsyms == NULL && cookie->locsymcount != 0)
-+  if (cookie->locsymcount != 0)
-     {
--      cookie->locsyms = bfd_elf_get_elf_syms (abfd, symtab_hdr,
--					      cookie->locsymcount, 0,
--					      NULL, NULL, NULL);
-+      cookie->locsyms = bfd_elf_get_elf_syms_cached (abfd, symtab_hdr,
-+						     cookie->locsymcount,
-+						     0, NULL, NULL,
-+						     NULL);
-       if (cookie->locsyms == NULL)
- 	{
- 	  info->callbacks->einfo (_("%P%X: can not read symbols: %E\n"));
- 	  return false;
- 	}
--      if (keep_memory || _bfd_elf_link_keep_memory (info))
--	{
--	  symtab_hdr->contents = (bfd_byte *) cookie->locsyms;
--	  info->cache_size += (cookie->locsymcount
--			       * sizeof (Elf_Internal_Sym));
--	}
-     }
-   return true;
- }
- 
--/* Free the memory allocated by init_reloc_cookie, if appropriate.  */
--
--static void
--fini_reloc_cookie (struct elf_reloc_cookie *cookie, bfd *abfd)
--{
--  Elf_Internal_Shdr *symtab_hdr;
--
--  symtab_hdr = &elf_tdata (abfd)->symtab_hdr;
--  if (symtab_hdr->contents != (unsigned char *) cookie->locsyms)
--    free (cookie->locsyms);
--}
--
- /* Initialize the relocation information in COOKIE for input section SEC
-    of input bfd ABFD.  */
- 
-@@ -13996,28 +13942,9 @@ init_reloc_cookie_for_section (struct elf_reloc_cookie *cookie,
- 			       struct bfd_link_info *info,
- 			       asection *sec, bool keep_memory)
- {
--  if (!init_reloc_cookie (cookie, info, sec->owner, keep_memory))
--    goto error1;
--  if (!init_reloc_cookie_rels (cookie, info, sec->owner, sec,
--			       keep_memory))
--    goto error2;
--  return true;
--
-- error2:
--  fini_reloc_cookie (cookie, sec->owner);
-- error1:
--  return false;
--}
--
--/* Free the memory allocated by init_reloc_cookie_for_section,
--   if appropriate.  */
--
--static void
--fini_reloc_cookie_for_section (struct elf_reloc_cookie *cookie,
--			       asection *sec)
--{
--  fini_reloc_cookie_rels (cookie, sec);
--  fini_reloc_cookie (cookie, sec->owner);
-+  return (init_reloc_cookie (cookie, info, sec->owner)
-+	  && init_reloc_cookie_rels (cookie, info, sec->owner, sec,
-+				     keep_memory));
- }
- 
- /* Garbage collect unused sections.  */
-@@ -14209,7 +14136,7 @@ _bfd_elf_gc_mark (struct bfd_link_info *info,
- 		ret = false;
- 		break;
- 	      }
--	  fini_reloc_cookie_for_section (&cookie, sec);
-+	  fini_reloc_cookie_rels (&cookie, sec);
- 	}
-     }
- 
-@@ -14231,7 +14158,7 @@ _bfd_elf_gc_mark (struct bfd_link_info *info,
- 	  if (!_bfd_elf_gc_mark_fdes (info, sec, eh_frame,
- 				      gc_mark_hook, &cookie))
- 	    ret = false;
--	  fini_reloc_cookie_for_section (&cookie, eh_frame);
-+	  fini_reloc_cookie_rels (&cookie, eh_frame);
- 	}
-     }
- 
-@@ -14665,7 +14592,7 @@ bfd_elf_parse_eh_frame_entries (bfd *abfd ATTRIBUTE_UNUSED,
-       if (sec == NULL || sec->sec_info_type == SEC_INFO_TYPE_JUST_SYMS)
- 	continue;
- 
--      if (!init_reloc_cookie (&cookie, info, ibfd, false))
-+      if (!init_reloc_cookie (&cookie, info, ibfd))
- 	return false;
- 
-       for (sec = ibfd->sections; sec; sec = sec->next)
-@@ -14724,7 +14651,7 @@ bfd_elf_gc_sections (bfd *abfd, struct bfd_link_info *info)
- 	  if (elf_section_data (sec)->sec_info
- 	      && (sec->flags & SEC_LINKER_CREATED) == 0)
- 	    elf_eh_frame_section (sub) = sec;
--	  fini_reloc_cookie_for_section (&cookie, sec);
-+	  fini_reloc_cookie_rels (&cookie, sec);
- 	  sec = bfd_get_next_section_by_name (NULL, sec);
- 	}
-     }
-@@ -14784,6 +14711,9 @@ bfd_elf_gc_sections (bfd *abfd, struct bfd_link_info *info)
- 	    if (!_bfd_elf_gc_mark (info, o, gc_mark_hook))
- 	      return false;
- 	  }
-+
-+      if (!_bfd_elf_link_keep_memory (info))
-+	bfd_elf_free_symtab (sub);
-     }
- 
-   /* Allow the backend to mark additional target specific sections.  */
-@@ -15239,7 +15169,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
- 					  &cookie))
- 	    changed = 1;
- 
--	  fini_reloc_cookie_for_section (&cookie, i);
-+	  fini_reloc_cookie_rels (&cookie, i);
- 	}
-     }
- 
-@@ -15274,7 +15204,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
- 		changed = 1;
- 	    }
- 
--	  fini_reloc_cookie_for_section (&cookie, i);
-+	  fini_reloc_cookie_rels (&cookie, i);
- 	}
- 
-       eh_alignment = ((1 << o->alignment_power)
-@@ -15339,7 +15269,7 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
- 		    changed = 1;
- 		}
- 	    }
--	  fini_reloc_cookie_for_section (&cookie, i);
-+	  fini_reloc_cookie_rels (&cookie, i);
- 	}
-       /* Update the reference to the output .sframe section.  Used to
- 	 determine later if PT_GNU_SFRAME segment is to be generated.  */
-@@ -15362,13 +15292,11 @@ bfd_elf_discard_info (bfd *output_bfd, struct bfd_link_info *info)
- 
-       if (bed->elf_backend_discard_info != NULL)
- 	{
--	  if (!init_reloc_cookie (&cookie, info, abfd, false))
-+	  if (!init_reloc_cookie (&cookie, info, abfd))
- 	    return -1;
- 
- 	  if ((*bed->elf_backend_discard_info) (abfd, &cookie, info))
- 	    changed = 1;
--
--	  fini_reloc_cookie (&cookie, abfd);
- 	}
-     }
- 
 diff --git a/bfd/elfxx-x86.c b/bfd/elfxx-x86.c
 index 140e86888a6..a44b0bb9124 100644
 --- a/bfd/elfxx-x86.c
@@ -1029,6 +842,8 @@ index 7241de70709..0cabab8dc1f 100644
        if (isymbuf == NULL)
  	{
  	  bfderrstr = N_("cannot read symbol table");
+
+base-commit: 865101d377d06b428c7f6843d70001dd00857b2a
 -- 
 2.51.0
 
