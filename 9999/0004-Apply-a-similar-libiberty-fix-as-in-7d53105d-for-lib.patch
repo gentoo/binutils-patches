@@ -1,7 +1,7 @@
-From c888b2e67d8e45c20aac1912ff9cd34cbea48d9e Mon Sep 17 00:00:00 2001
-Message-ID: <c888b2e67d8e45c20aac1912ff9cd34cbea48d9e.1758805647.git.sam@gentoo.org>
-In-Reply-To: <4ebcb339f9d678aef53596022a3e6125dfed109a.1758805647.git.sam@gentoo.org>
-References: <4ebcb339f9d678aef53596022a3e6125dfed109a.1758805647.git.sam@gentoo.org>
+From cd3fc7df6701016e577df8d1c3a02aba0d5ac42b Mon Sep 17 00:00:00 2001
+Message-ID: <cd3fc7df6701016e577df8d1c3a02aba0d5ac42b.1762160821.git.sam@gentoo.org>
+In-Reply-To: <2417d4ce6d1ab1c54d0b384f8d2d98a4b8545b09.1762160821.git.sam@gentoo.org>
+References: <2417d4ce6d1ab1c54d0b384f8d2d98a4b8545b09.1762160821.git.sam@gentoo.org>
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Wed, 22 Feb 2023 20:05:35 +0100
 Subject: [PATCH 4/4] Apply a similar libiberty fix as in 7d53105d for
@@ -15,10 +15,10 @@ Bug: https://bugs.gentoo.org/834720
 Signed-off-by: Andreas K. Hüttel <dilfridge@gentoo.org>
 ---
  gprofng/src/Makefile.am | 3 ++-
- gprofng/src/Makefile.in | 3 ++-
+ gprofng/src/Makefile.in | 6 ++++--
  opcodes/configure       | 4 ++--
  opcodes/configure.ac    | 4 ++--
- 4 files changed, 8 insertions(+), 6 deletions(-)
+ 4 files changed, 10 insertions(+), 7 deletions(-)
 
 diff --git a/gprofng/src/Makefile.am b/gprofng/src/Makefile.am
 index f6d3f5da759..36c334bb359 100644
@@ -35,10 +35,20 @@ index f6d3f5da759..36c334bb359 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/gprofng/src/Makefile.in b/gprofng/src/Makefile.in
-index 0a1934e8344..374a887adae 100644
+index 0a1934e8344..adf178c7f6a 100644
 --- a/gprofng/src/Makefile.in
 +++ b/gprofng/src/Makefile.in
-@@ -558,7 +558,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
+@@ -164,7 +164,8 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
+ 	"$(DESTDIR)$(dbedir)"
+ LTLIBRARIES = $(lib_LTLIBRARIES)
+ am__DEPENDENCIES_1 =
+-libgprofng_la_DEPENDENCIES = $(top_builddir)/../opcodes/libopcodes.la \
++libgprofng_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
++	$(top_builddir)/../opcodes/libopcodes.la \
+ 	$(top_builddir)/../bfd/libbfd.la $(am__DEPENDENCIES_1)
+ am__objects_1 = Application.lo BaseMetric.lo BaseMetricTreeNode.lo \
+ 	CallStack.lo CatchOutOfMemory.lo ClassFile.lo Command.lo \
+@@ -558,7 +559,8 @@ libgprofng_la_LDFLAGS = -version-info 0:0:0
  # Pass -lpthread instead of $(PTHREAD_LIBS) due to $(PTHREAD_LIBS) being empty
  # when -nostdlib is passed to libtool.
  # See bug 29364 - libgprofng.so: needs to link against -pthread
@@ -49,10 +59,10 @@ index 0a1934e8344..374a887adae 100644
  	$(GPROFNG_LIBADD) \
  	-lpthread -ldl
 diff --git a/opcodes/configure b/opcodes/configure
-index df9f63d1031..8c46bcf79ba 100755
+index 48c53a2ff2b..6bdc4623969 100755
 --- a/opcodes/configure
 +++ b/opcodes/configure
-@@ -14256,10 +14256,10 @@ if test "$enable_shared" = "yes"; then
+@@ -14255,10 +14255,10 @@ if test "$enable_shared" = "yes"; then
    case "${host}" in
      *-*-cygwin*)
        SHARED_LDFLAGS="-no-undefined"
@@ -83,5 +93,5 @@ index 675f0662700..0220ec13312 100644
        ;;
    esac
 -- 
-2.51.0
+2.51.2
 

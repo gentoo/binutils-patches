@@ -1,5 +1,5 @@
-From 4ebcb339f9d678aef53596022a3e6125dfed109a Mon Sep 17 00:00:00 2001
-Message-ID: <4ebcb339f9d678aef53596022a3e6125dfed109a.1758805647.git.sam@gentoo.org>
+From 2417d4ce6d1ab1c54d0b384f8d2d98a4b8545b09 Mon Sep 17 00:00:00 2001
+Message-ID: <2417d4ce6d1ab1c54d0b384f8d2d98a4b8545b09.1762160821.git.sam@gentoo.org>
 From: Mike Frysinger <vapier@gentoo.org>
 Date: Fri, 7 Jan 2005 00:15:53 -0500
 Subject: [PATCH 1/4] Gentoo: libiberty: install PIC version of libiberty.a
@@ -30,6 +30,8 @@ index d507f27a9ef..51fefcb31c2 100644
  	  cd ..; \
  	else true; fi; \
  	if [ x"$(NOASANFLAG)" != x ]; then \
+
+base-commit: ef442f8e7f1db571d0a6a1ea0c01e8debb0ea4e7
 -- 
-2.51.0
+2.51.2
 

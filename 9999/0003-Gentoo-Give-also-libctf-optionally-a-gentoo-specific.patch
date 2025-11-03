@@ -1,7 +1,7 @@
-From 07128aa7ebc4a73170d4cebc036c9c64b7529f6e Mon Sep 17 00:00:00 2001
-Message-ID: <07128aa7ebc4a73170d4cebc036c9c64b7529f6e.1758805647.git.sam@gentoo.org>
-In-Reply-To: <4ebcb339f9d678aef53596022a3e6125dfed109a.1758805647.git.sam@gentoo.org>
-References: <4ebcb339f9d678aef53596022a3e6125dfed109a.1758805647.git.sam@gentoo.org>
+From b9c274238390aaa895ea4dbb94c607dac83bb43e Mon Sep 17 00:00:00 2001
+Message-ID: <b9c274238390aaa895ea4dbb94c607dac83bb43e.1762160821.git.sam@gentoo.org>
+In-Reply-To: <2417d4ce6d1ab1c54d0b384f8d2d98a4b8545b09.1762160821.git.sam@gentoo.org>
+References: <2417d4ce6d1ab1c54d0b384f8d2d98a4b8545b09.1762160821.git.sam@gentoo.org>
 From: =?UTF-8?q?Andreas=20K=2E=20H=C3=BCttel?= <dilfridge@gentoo.org>
 Date: Sat, 24 Jul 2021 15:20:16 +0200
 Subject: [PATCH 3/4] Gentoo: Give also libctf optionally a gentoo-specific
@@ -10,9 +10,9 @@ Subject: [PATCH 3/4] Gentoo: Give also libctf optionally a gentoo-specific
 ---
  libctf/Makefile.am  | 14 +++++++++++++-
  libctf/Makefile.in  |  9 ++++++++-
- libctf/configure    | 31 +++++++++++++++++++++++++++++++
+ libctf/configure    | 35 +++++++++++++++++++++++++++++++++--
  libctf/configure.ac | 10 ++++++++++
- 4 files changed, 62 insertions(+), 2 deletions(-)
+ 4 files changed, 64 insertions(+), 4 deletions(-)
 
 diff --git a/libctf/Makefile.am b/libctf/Makefile.am
 index 6e136220497..12301277275 100644
@@ -83,7 +83,7 @@ index 7c309b1fc04..c71e22d1b72 100644
  libctf_nobfd_la_CPPFLAGS = $(AM_CPPFLAGS) -DNOBFD=1
  libctf_nobfd_la_SOURCES = ctf-archive.c ctf-dump.c ctf-create.c \
 diff --git a/libctf/configure b/libctf/configure
-index becb131103a..5179121719c 100755
+index 1b02c399dd9..d918965e234 100755
 --- a/libctf/configure
 +++ b/libctf/configure
 @@ -646,6 +646,10 @@ BUILD_INFO_FALSE
@@ -114,7 +114,25 @@ index becb131103a..5179121719c 100755
  
  Some influential environment variables:
    CC          C compiler command
-@@ -16657,6 +16664,26 @@ else
+@@ -13970,7 +13977,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 13973 "configure"
++#line 13980 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -14076,7 +14083,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 14079 "configure"
++#line 14086 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -16656,6 +16663,26 @@ else
  fi
  
  
@@ -141,7 +159,7 @@ index becb131103a..5179121719c 100755
  # Similar to GDB_AC_CHECK_BFD.
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
-@@ -17560,6 +17587,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
+@@ -17559,6 +17586,10 @@ if test -z "${ENABLE_LIBCTF_HASH_DEBUGGING_TRUE}" && test -z "${ENABLE_LIBCTF_HA
    as_fn_error $? "conditional \"ENABLE_LIBCTF_HASH_DEBUGGING\" was never defined.
  Usually this means the macro was only invoked conditionally." "$LINENO" 5
  fi
@@ -174,5 +192,5 @@ index 62e62250c80..5266b1381df 100644
  OLD_CFLAGS=$CFLAGS
  OLD_LDFLAGS=$LDFLAGS
 -- 
-2.51.0
+2.51.2
 
