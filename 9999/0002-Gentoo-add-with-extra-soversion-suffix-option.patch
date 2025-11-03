@@ -32,7 +32,6 @@ Ported to binutils 2.37 by Andreas K. Hüttel <dilfridge@gentoo.org>
 ---
  bfd/Makefile.am  |  5 +++++
  bfd/Makefile.in  |  4 ++++
- bfd/compress.c   |  2 +-
  bfd/configure    | 17 +++++++++++++++--
  bfd/configure.ac |  7 +++++++
  5 files changed, 32 insertions(+), 3 deletions(-)
@@ -82,19 +81,6 @@ index 6d1944c2664..07b1084f6b7 100644
  	$(SED) -e "s,@bfd_version@,$$bfd_version," \
  	    -e "s,@bfd_version_string@,$$bfd_version_string," \
  	    -e "s,@bfd_version_package@,$$bfd_version_package," \
-diff --git a/bfd/compress.c b/bfd/compress.c
-index 28788370210..3badf1e5896 100644
---- a/bfd/compress.c
-+++ b/bfd/compress.c
-@@ -641,7 +641,7 @@ bfd_compress_section_contents (bfd *abfd, sec_ptr sec)
- 					   compressed_size,
- 					   input_buffer,
- 					   uncompressed_size,
--					   ZSTD_CLEVEL_DEFAULT);
-+					   19);
- 	  if (ZSTD_isError (compressed_size))
- 	    {
- 	      bfd_release (abfd, buffer);
 diff --git a/bfd/configure b/bfd/configure
 index d9d77b7004c..f238da28e61 100755
 --- a/bfd/configure
