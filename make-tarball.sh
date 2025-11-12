@@ -118,7 +118,7 @@ echo "Generated with make-tarball.sh ${mydescpatches}" >> "tmp/README.Gentoo.pat
 
 # create and rename patches
 
-git --no-cover-letter --no-base format-patch ${starttag}..HEAD > /dev/null || exit 1
+git format-patch --no-base --no-cover-letter ${starttag}..HEAD > /dev/null || exit 1
 
 # remove all patches where the summary line starts with:
 # - [no-tarball]: not related to upstream tarball
