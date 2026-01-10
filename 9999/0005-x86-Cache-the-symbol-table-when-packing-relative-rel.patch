@@ -1,5 +1,5 @@
-From 5d13b6b045c538c86e0403bfe040a6a822d2cc42 Mon Sep 17 00:00:00 2001
-Message-ID: <5d13b6b045c538c86e0403bfe040a6a822d2cc42.1768005907.git.sam@gentoo.org>
+From 52b2e435c8b91b0a08c43701736e241f90405e67 Mon Sep 17 00:00:00 2001
+Message-ID: <52b2e435c8b91b0a08c43701736e241f90405e67.1768032265.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Fri, 9 Jan 2026 08:54:42 +0800
 Subject: [PATCH] x86: Cache the symbol table when packing relative relocations
@@ -27,11 +27,11 @@ page faults     2406941
 
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
- bfd/elfxx-x86.c | 25 +++++++++----------------
- 1 file changed, 9 insertions(+), 16 deletions(-)
+ bfd/elfxx-x86.c | 52 ++++++++++++++++++++-----------------------------
+ 1 file changed, 21 insertions(+), 31 deletions(-)
 
 diff --git a/bfd/elfxx-x86.c b/bfd/elfxx-x86.c
-index 36ba7919f47..84ea4c1f4ba 100644
+index 36ba7919f47..fc51bf262a5 100644
 --- a/bfd/elfxx-x86.c
 +++ b/bfd/elfxx-x86.c
 @@ -1011,7 +1011,7 @@ elf_x86_relative_reloc_record_add
@@ -52,6 +52,15 @@ index 36ba7919f47..84ea4c1f4ba 100644
      }
    relative_reloc->data[newidx].offset = offset;
    relative_reloc->data[newidx].address = 0;
+@@ -1079,7 +1077,7 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
+   Elf_Internal_Shdr *symtab_hdr;
+   Elf_Internal_Rela *internal_relocs;
+   Elf_Internal_Rela *irel, *irelend;
+-  Elf_Internal_Sym *isymbuf = NULL;
++  Elf_Internal_Sym *isymbuf;
+   struct elf_link_hash_entry **sym_hashes;
+   elf_backend_data *bed;
+   struct elf_x86_link_hash_table *htab;
 @@ -1087,7 +1085,6 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
    bool is_x86_64;
    bool unaligned_section;
@@ -60,7 +69,52 @@ index 36ba7919f47..84ea4c1f4ba 100644
  
    /* Assume we're not going to change any sizes, and we'll only need
       one pass.  */
-@@ -1278,8 +1275,7 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
+@@ -1131,6 +1128,23 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
+   if (internal_relocs == NULL)
+     return false;
+ 
++  isymbuf = (Elf_Internal_Sym *) symtab_hdr->contents;
++  if (isymbuf == NULL && symtab_hdr->sh_info > 1)
++    {
++      /* symtab_hdr->sh_info == the number of local symbols + 1.  Load
++	 the symbol table if there are local symbols.  */
++      isymbuf = bfd_elf_get_elf_syms (abfd, symtab_hdr,
++				      symtab_hdr->sh_info,
++				      0, NULL, NULL, NULL);
++      if (isymbuf == NULL)
++	return false;
++
++      /* Cache the symbol table to avoid loading the same symbol table
++	 repeatedly which can take a long time if the input has many
++	 code sections.  */
++      symtab_hdr->contents = (unsigned char *) isymbuf;
++    }
++
+   irelend = internal_relocs + input_section->reloc_count;
+   for (irel = internal_relocs; irel < irelend; irel++)
+     {
+@@ -1163,20 +1177,6 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
+ 
+       if (r_symndx < symtab_hdr->sh_info)
+ 	{
+-	  /* Read this BFD's local symbols.  */
+-	  if (isymbuf == NULL)
+-	    {
+-	      isymbuf = (Elf_Internal_Sym *) symtab_hdr->contents;
+-	      if (isymbuf == NULL)
+-		{
+-		  isymbuf = bfd_elf_get_elf_syms (abfd, symtab_hdr,
+-						  symtab_hdr->sh_info,
+-						  0, NULL, NULL, NULL);
+-		  if (isymbuf == NULL)
+-		    goto error_return;
+-		}
+-	    }
+-
+ 	  isym = isymbuf + r_symndx;
+ 	  switch (isym->st_shndx)
+ 	    {
+@@ -1278,8 +1278,7 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
  	  if (!elf_x86_relative_reloc_record_add (info,
  						  &htab->relative_reloc,
  						  irel, htab->elf.sgot,
@@ -70,7 +124,7 @@ index 36ba7919f47..84ea4c1f4ba 100644
  	    goto error_return;
  
  	  continue;
-@@ -1348,8 +1344,7 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
+@@ -1348,8 +1347,7 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
  		 ((unaligned_section || unaligned_offset)
  		  ? &htab->unaligned_relative_reloc
  		  : &htab->relative_reloc),
@@ -80,7 +134,7 @@ index 36ba7919f47..84ea4c1f4ba 100644
  	    goto error_return;
  	}
      }
-@@ -1359,14 +1354,12 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
+@@ -1359,14 +1357,6 @@ _bfd_x86_elf_link_relax_section (bfd *abfd ATTRIBUTE_UNUSED,
    return_status = true;
  
  error_return:
@@ -92,17 +146,11 @@ index 36ba7919f47..84ea4c1f4ba 100644
 -      else
 -	free (isymbuf);
 -    }
-+  if (isymbuf != NULL
-+      && (unsigned char *) isymbuf != symtab_hdr->contents)
-+    /* Cache the symbol buffer to avoid loading it again.  If the input
-+       has many code sections, loading the same symbol table over and
-+       over can take a long time.  */
-+    symtab_hdr->contents = (unsigned char *) isymbuf;
    if (elf_section_data (input_section)->relocs != internal_relocs)
      free (internal_relocs);
    return return_status;
 
-base-commit: d1d83ec7dbd9bbe53dac9b5f783f35522361a593
+base-commit: fa20c3de21cd86a90dfe94328626ce6730df3a63
 -- 
 2.52.0
 
