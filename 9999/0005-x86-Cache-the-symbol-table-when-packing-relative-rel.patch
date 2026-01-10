@@ -1,4 +1,37 @@
-https://sourceware.org/bugzilla/show_bug.cgi?id=33765#c7
+From 5d13b6b045c538c86e0403bfe040a6a822d2cc42 Mon Sep 17 00:00:00 2001
+Message-ID: <5d13b6b045c538c86e0403bfe040a6a822d2cc42.1768005907.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Fri, 9 Jan 2026 08:54:42 +0800
+Subject: [PATCH] x86: Cache the symbol table when packing relative relocations
+
+When packing relative relocations, x86 linker may load the same symbol
+table repeatedly, which can take a long time.  On Intel Core i7-1195G7
+with 32GB RAM, it takes more than 45 minutes to create an output with
+-pie -z pack-relative-relocs from an input with 208025 code sections.
+Cache the symbol table to reduce the link time to less than 2 seconds.
+
+On the same machine, creating 3.1GB clang executable in LLVM 21.1.3 debug
+build:
+
+user            55.39 seconds
+system          6.71 seconds
+total           65.80 seconds
+maximum set(GB) 10.43
+page faults     2406941
+
+	PR ld/33765
+	* elfxx-x86.c (elf_x86_relative_reloc_record_add): Remove
+	keep_symbuf_p.
+	(_bfd_x86_elf_link_relax_section): Updated.  Cache the symbol
+	table to avoid loading it again.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ bfd/elfxx-x86.c | 25 +++++++++----------------
+ 1 file changed, 9 insertions(+), 16 deletions(-)
+
+diff --git a/bfd/elfxx-x86.c b/bfd/elfxx-x86.c
+index 36ba7919f47..84ea4c1f4ba 100644
 --- a/bfd/elfxx-x86.c
 +++ b/bfd/elfxx-x86.c
 @@ -1011,7 +1011,7 @@ elf_x86_relative_reloc_record_add
@@ -68,3 +101,8 @@ https://sourceware.org/bugzilla/show_bug.cgi?id=33765#c7
    if (elf_section_data (input_section)->relocs != internal_relocs)
      free (internal_relocs);
    return return_status;
+
+base-commit: d1d83ec7dbd9bbe53dac9b5f783f35522361a593
+-- 
+2.52.0
+
