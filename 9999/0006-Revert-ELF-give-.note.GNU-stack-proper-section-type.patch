@@ -1,0 +1,49 @@
+From 684d0071d3ed48351325d8935c0697cf43a30902 Mon Sep 17 00:00:00 2001
+Message-ID: <684d0071d3ed48351325d8935c0697cf43a30902.1768011380.git.sam@gentoo.org>
+From: Sam James <sam@gentoo.org>
+Date: Sat, 10 Jan 2026 02:16:18 +0000
+Subject: [PATCH] Revert "ELF: give .note.GNU-stack proper section type"
+
+This reverts commit c8db2c887b4129732341c4a1a51cdcd3191db271.
+
+Bug: https://sourceware.org/PR33780
+---
+ gas/as.c   | 2 +-
+ ld/ldelf.c | 6 ++----
+ 2 files changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/gas/as.c b/gas/as.c
+index d0e508cb2e3..3d035830c83 100644
+--- a/gas/as.c
++++ b/gas/as.c
+@@ -1505,7 +1505,7 @@ main (int argc, char ** argv)
+       gnustack = subseg_new (".note.GNU-stack", 0);
+       bfd_set_section_flags (gnustack,
+ 			     SEC_READONLY | (flag_execstack ? SEC_CODE : 0));
+-      elf_section_type (gnustack) = SHT_NOTE;
++
+     }
+ #endif
+ 
+diff --git a/ld/ldelf.c b/ld/ldelf.c
+index fe4ab17b01f..a67f540b2df 100644
+--- a/ld/ldelf.c
++++ b/ld/ldelf.c
+@@ -1327,10 +1327,8 @@ ldelf_after_open (int use_libpath, int native, int is_linux, int is_freebsd,
+ 	     effect.  Instead we create a .note.GNU-stack section in much the
+ 	     same way as the assembler does with its --[no]execstack option.  */
+ 	  flagword flags = SEC_READONLY | (link_info.execstack ? SEC_CODE : 0);
+-	  s = bfd_make_section_with_flags (link_info.input_bfds,
+-					   ".note.GNU-stack", flags);
+-	  if (s)
+-	    elf_section_type (s) = SHT_NOTE;
++	  (void) bfd_make_section_with_flags (link_info.input_bfds,
++					      ".note.GNU-stack", flags);
+ 	}
+       return;
+     }
+
+base-commit: d1d83ec7dbd9bbe53dac9b5f783f35522361a593
+-- 
+2.52.0
+
