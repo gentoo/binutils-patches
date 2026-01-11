@@ -1,16 +1,20 @@
-From c11a9a01b6afbdb9ba989ad36a7bcb6cfac86f15 Mon Sep 17 00:00:00 2001
-Message-ID: <c11a9a01b6afbdb9ba989ad36a7bcb6cfac86f15.1768032306.git.sam@gentoo.org>
+From bd003d6e4b53b846fa8e576e050aee473bd4054d Mon Sep 17 00:00:00 2001
+Message-ID: <bd003d6e4b53b846fa8e576e050aee473bd4054d.1768126718.git.sam@gentoo.org>
 From: "H.J. Lu" <hjl.tools@gmail.com>
 Date: Sat, 10 Jan 2026 11:41:48 +0800
 Subject: [PATCH] elf: Don't set .note.GNU-stack type to SHT_NOTE
 
-.note.GNU-stack section doesn't conform to SHT_NOTE spec:
+.note.GNU-stack section was introduced with the SHT_PROGBITS type.
+Although its name starts with ".note.", but it doesn't conform to
+SHT_NOTE specification:
 
 https://gabi.xinuos.com/v42/elf/07-pheader.html#note-sections
 
-since it is an empty section with the corresponding fields.  It maps to
-PT_GNU_STACK segment, not PT_NOTE segment.  It is inappropriate to set
-its type to SHT_NOTE.
+since it is an empty section without the corresponding SHT_NOTE section
+fields and maps to PT_GNU_STACK segment, not PT_NOTE segment.  Linkers
+normally check section types when laying out the output, but they also
+check section names for special sections, like .note.GNU-stack.  It is
+inappropriate to set its type to SHT_NOTE.
 
 Revert
 
@@ -20,7 +24,8 @@ Date:   Fri Jan 9 08:39:38 2026 +0100
 
     ELF: give .note.GNU-stack proper section type
 
-and add tests.
+and add tests to verify that .note.GNU-stack section has the SHT_PROGBITS
+type.
 
 gas/
 
@@ -35,23 +40,26 @@ ld/
 	PR ld/33780
 	* ldelf.c (ldelf_after_open): Don't set .note.GNU-stack section
 	type to SHT_NOTE.
-	* testsuite/ld-elf/pr33780.d: New file.
-	* testsuite/ld-elf/pr33780.s: Likewise.
+	* testsuite/ld-elf/pr33780a.d: New file.
+	* testsuite/ld-elf/pr33780b.d: Likewise.
+	* testsuite/ld-elf/pr33780c.d: Likewise.
 
 Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
 ---
- gas/as.c                                  | 1 -
- gas/testsuite/gas/elf/elf.exp             | 1 +
- gas/testsuite/gas/elf/section-GNU-stack.d | 5 +++++
- gas/testsuite/gas/elf/section-GNU-stack.s | 1 +
- ld/ldelf.c                                | 6 ++----
- ld/testsuite/ld-elf/pr33780.d             | 6 ++++++
- ld/testsuite/ld-elf/pr33780.s             | 4 ++++
- 7 files changed, 19 insertions(+), 5 deletions(-)
+ gas/as.c                                  |  1 -
+ gas/testsuite/gas/elf/elf.exp             |  1 +
+ gas/testsuite/gas/elf/section-GNU-stack.d |  5 +++++
+ gas/testsuite/gas/elf/section-GNU-stack.s |  1 +
+ ld/ldelf.c                                |  6 ++----
+ ld/testsuite/ld-elf/pr33780a.d            |  9 +++++++++
+ ld/testsuite/ld-elf/pr33780b.d            |  9 +++++++++
+ ld/testsuite/ld-elf/pr33780c.d            | 16 ++++++++++++++++
+ 8 files changed, 43 insertions(+), 5 deletions(-)
  create mode 100644 gas/testsuite/gas/elf/section-GNU-stack.d
  create mode 100644 gas/testsuite/gas/elf/section-GNU-stack.s
- create mode 100644 ld/testsuite/ld-elf/pr33780.d
- create mode 100644 ld/testsuite/ld-elf/pr33780.s
+ create mode 100644 ld/testsuite/ld-elf/pr33780a.d
+ create mode 100644 ld/testsuite/ld-elf/pr33780b.d
+ create mode 100644 ld/testsuite/ld-elf/pr33780c.d
 
 diff --git a/gas/as.c b/gas/as.c
 index d0e508cb2e3..200835b9311 100644
@@ -111,30 +119,60 @@ index fe4ab17b01f..a67f540b2df 100644
  	}
        return;
      }
-diff --git a/ld/testsuite/ld-elf/pr33780.d b/ld/testsuite/ld-elf/pr33780.d
+diff --git a/ld/testsuite/ld-elf/pr33780a.d b/ld/testsuite/ld-elf/pr33780a.d
 new file mode 100644
-index 00000000000..7ebfb691ba4
+index 00000000000..a4a199d72a6
 --- /dev/null
-+++ b/ld/testsuite/ld-elf/pr33780.d
-@@ -0,0 +1,6 @@
++++ b/ld/testsuite/ld-elf/pr33780a.d
+@@ -0,0 +1,9 @@
++#source: empty.s
 +#ld: -r -z noexecstack --format=binary
 +#readelf: -SW
++# These targets don't support -z.
++#xfail: [uses_genelf]
 +
 +#...
 +  \[[ 0-9]+\] \.note\.GNU-stack[ \t]+PROGBITS[ \t]+0+ +[0-9a-f]+ +0+ +00 +0 +0 +1
 +#pass
-diff --git a/ld/testsuite/ld-elf/pr33780.s b/ld/testsuite/ld-elf/pr33780.s
+diff --git a/ld/testsuite/ld-elf/pr33780b.d b/ld/testsuite/ld-elf/pr33780b.d
 new file mode 100644
-index 00000000000..4888b539c6b
+index 00000000000..d35c0bd84cb
 --- /dev/null
-+++ b/ld/testsuite/ld-elf/pr33780.s
-@@ -0,0 +1,4 @@
-+	.data
-+	.globl foo
-+foo:
-+	.dc.a 0
++++ b/ld/testsuite/ld-elf/pr33780b.d
+@@ -0,0 +1,9 @@
++#source: empty.s
++#ld: -r -z noexecstack
++#readelf: -SW
++# These targets don't support -z.
++#xfail: [uses_genelf]
++
++#...
++  \[[ 0-9]+\] \.note\.GNU-stack[ \t]+PROGBITS[ \t]+0+ +[0-9a-f]+ +0+ +00 +0 +0 +1
++#pass
+diff --git a/ld/testsuite/ld-elf/pr33780c.d b/ld/testsuite/ld-elf/pr33780c.d
+new file mode 100644
+index 00000000000..b5ff68e262e
+--- /dev/null
++++ b/ld/testsuite/ld-elf/pr33780c.d
+@@ -0,0 +1,16 @@
++#source: property-or-1.s
++#as: --generate-missing-build-notes=no
++#ld: -r -z noexecstack
++#readelf: -n
++#xfail: ![check_shared_lib_support]
++#notarget: am33_2.0-*-* hppa*-*-hpux* mn10300-*-*
++# Assembly source file for the HPPA assembler is renamed and modifed by
++# sed.  mn10300 has relocations in .note.gnu.property section which
++# elf_parse_notes doesn't support.
++
++#...
++Displaying notes found in: .note.gnu.property
++[ 	]+Owner[ 	]+Data size[ 	]+Description
++  GNU                  0x[0-9a-f]+	NT_GNU_PROPERTY_TYPE_0
++      Properties: UINT32_OR \(0xb000ffff\): 0x3
++#pass
 
-base-commit: fa20c3de21cd86a90dfe94328626ce6730df3a63
+base-commit: 93285ef5f3106df2016fdd231121bbfcf92ead51
 -- 
 2.52.0
 
