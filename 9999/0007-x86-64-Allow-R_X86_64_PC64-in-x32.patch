@@ -1,0 +1,109 @@
+From 5694abd4c4faad8081ef7b12999be7c12b9c5d8e Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Sun, 18 Jan 2026 09:24:48 +0800
+Subject: [PATCH] x86-64: Allow R_X86_64_PC64 in x32
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ bfd/elf64-x86-64.c                |  1 -
+ ld/testsuite/ld-x86-64/sframe.rd  | 16 ++++++++++++++++
+ ld/testsuite/ld-x86-64/sframe.s   |  9 +++++++++
+ ld/testsuite/ld-x86-64/x86-64.exp | 32 +++++++++++++++++++++++++++++++
+ 4 files changed, 57 insertions(+), 1 deletion(-)
+ create mode 100644 ld/testsuite/ld-x86-64/sframe.rd
+ create mode 100644 ld/testsuite/ld-x86-64/sframe.s
+
+diff --git a/bfd/elf64-x86-64.c b/bfd/elf64-x86-64.c
+index 84c558fd157..55102f83365 100644
+--- a/bfd/elf64-x86-64.c
++++ b/bfd/elf64-x86-64.c
+@@ -2629,7 +2629,6 @@ elf_x86_64_scan_relocs (bfd *abfd, struct bfd_link_info *info,
+ 
+ 	  case R_X86_64_DTPOFF64:
+ 	  case R_X86_64_TPOFF64:
+-	  case R_X86_64_PC64:
+ 	  case R_X86_64_GOTOFF64:
+ 	  case R_X86_64_GOT64:
+ 	  case R_X86_64_GOTPCREL64:
+diff --git a/ld/testsuite/ld-x86-64/sframe.rd b/ld/testsuite/ld-x86-64/sframe.rd
+new file mode 100644
+index 00000000000..cbdec3e30e7
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/sframe.rd
+@@ -0,0 +1,16 @@
++Contents of the SFrame section .sframe:
++  Header :
++
++    Version: SFRAME_VERSION_3
++    Flags: SFRAME_F_FDE_SORTED,
++           SFRAME_F_FDE_FUNC_START_PCREL
++    CFA fixed RA offset: -8
++    Num FDEs: 1
++    Num FREs: 1
++
++  Function Index :
++
++    func idx \[0\]: pc = 0x1000, size = 1 bytes
++    STARTPC         CFA       FP        RA           
++    0000000000001000  sp\+8      u         f            
++#pass
+diff --git a/ld/testsuite/ld-x86-64/sframe.s b/ld/testsuite/ld-x86-64/sframe.s
+new file mode 100644
+index 00000000000..0049b0f40fd
+--- /dev/null
++++ b/ld/testsuite/ld-x86-64/sframe.s
+@@ -0,0 +1,9 @@
++	.text
++	.p2align 4
++	.globl	foo
++	.type	foo, @function
++foo:
++	.cfi_startproc
++	ret
++	.cfi_endproc
++	.size	foo, .-foo
+diff --git a/ld/testsuite/ld-x86-64/x86-64.exp b/ld/testsuite/ld-x86-64/x86-64.exp
+index aa5c90f8ca2..1cd94b9ebeb 100644
+--- a/ld/testsuite/ld-x86-64/x86-64.exp
++++ b/ld/testsuite/ld-x86-64/x86-64.exp
+@@ -651,6 +651,38 @@ if ![ld_assemble $as "--64 $srcdir/$subdir/foo.s" tmpdir/foo64.o] {
+     return
+ }
+ 
++if { ![skip_sframe_tests] } {
++    run_ld_link_tests [list \
++	[list \
++	    "Build sframe.o" \
++	    "-m elf_x86_64" \
++	    "" \
++	    "--64 --gsframe" \
++	    {sframe.s} \
++	] \
++    ]
++
++    set cmd "$objcopy -O elf32-x86-64 tmpdir/sframe.o tmpdir/sframe-x32.o"
++    send_log "$cmd\n"
++    set got [remote_exec host "$cmd"]
++    if { [lindex $got 0] != 0 || ![string match "" [lindex $got 1]] } then {
++	send_log "$got\n"
++	fail "Convert x86-64 sframe.o to x32"
++    } else {
++	run_ld_link_tests [list \
++	    [list \
++		"X32 DSO from x86-64 sframe.o" \
++		"-shared -melf32_x86_64 tmpdir/sframe-x32.o" \
++		"$NOSANITIZE_CFLAGS" \
++		"--x32 -mx86-used-note=yes" \
++		{dummy.s} \
++		{{readelf --sframe sframe.rd}} \
++		"sframe-x32" \
++	    ] \
++	]
++    }
++}
++
+ run_dump_test "compressed1"
+ run_dump_test "ilp32-1"
+ run_dump_test "ilp32-2"
+-- 
+2.52.0
