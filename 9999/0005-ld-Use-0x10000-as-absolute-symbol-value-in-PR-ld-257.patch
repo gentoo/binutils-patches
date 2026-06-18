@@ -1,0 +1,53 @@
+From 9d7c1cc4edaa076234c84f42b34f40137b95f688 Mon Sep 17 00:00:00 2001
+Message-ID: <9d7c1cc4edaa076234c84f42b34f40137b95f688.1781815238.git.sam@gentoo.org>
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Thu, 18 Jun 2026 19:57:20 +0800
+Subject: [PATCH] ld: Use 0x10000 as absolute symbol value in PR ld/25754 tests
+
+PR ld/25754 tests verify that relocations against absolute symbol are
+properly handled, using 42 as the absolute symbol value.  But GCC 17
+treats 42 as the impossible symbol address, which is the absolute symbol
+value and optimize out the symbol address check:
+
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=125869
+
+Use 0x10000, instead of 42, as absolute symbol value to work with GCC 17.
+
+	PR ld/34298
+	* testsuite/ld-elf/pr25754-1a.c (main): Check against 0x10000
+	instead of 42.
+	* testsuite/ld-elf/pr25754-1b.s (bar): Replace 42 with 0x10000.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+---
+ ld/testsuite/ld-elf/pr25754-1a.c | 2 +-
+ ld/testsuite/ld-elf/pr25754-1b.s | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/ld/testsuite/ld-elf/pr25754-1a.c b/ld/testsuite/ld-elf/pr25754-1a.c
+index bc65c174d05..30b7195cbb3 100644
+--- a/ld/testsuite/ld-elf/pr25754-1a.c
++++ b/ld/testsuite/ld-elf/pr25754-1a.c
+@@ -13,7 +13,7 @@ get_bar (void)
+ int
+ main ()
+ {
+-  if ((uintptr_t) get_bar () == 42)
++  if ((uintptr_t) get_bar () == 0x10000)
+     printf ("PASS\n");
+   return 0;
+ }
+diff --git a/ld/testsuite/ld-elf/pr25754-1b.s b/ld/testsuite/ld-elf/pr25754-1b.s
+index 99d585d6b5f..1babb39d49c 100644
+--- a/ld/testsuite/ld-elf/pr25754-1b.s
++++ b/ld/testsuite/ld-elf/pr25754-1b.s
+@@ -1,3 +1,3 @@
+ 	.data
+ 	.global bar
+-	bar = 42
++	bar = 0x10000
+
+base-commit: 0be1bae8288ba4268081917cd8f7013c0fcb88a2
+-- 
+2.54.0
+
