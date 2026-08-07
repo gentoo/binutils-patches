@@ -171,3 +171,4 @@ git tag -s -m "Gentoo patchset binutils-${PV}-${pver}" "gentoo/binutils-${PV}-${
 
 echo "Pushing the tag"
 git push gentoo gentoo/binutils-${PV}-${pver}
+git push gentoo
