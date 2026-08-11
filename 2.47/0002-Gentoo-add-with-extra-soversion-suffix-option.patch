@@ -1,0 +1,164 @@
+From 062144ba260931e309a621355b92a2ca3b1ec12c Mon Sep 17 00:00:00 2001
+From: Sergei Trofimovich <slyfox@gentoo.org>
+Date: Tue, 20 Jul 2021 21:12:38 +0200
+Subject: [PATCH 2/5] Gentoo: add --with-extra-soversion-suffix= option
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+--with-extra-soversion-suffix= will allow Gentoo to
+distinct libbfd.so and libopcodes.so to have more precise
+SONAME.
+
+Today --enable-targets=all and --enable-64-bit-bfd change
+libbfd.so ABI:
+--enable-targets=all adds new symbols to the library
+--enable-64-bit-bfd modifies BFD_ARCH_SIZE default and
+changes sizes of integer parameters and fields to most
+APIs.
+
+--with-extra-soversion-suffix= will allow Gentoo to inject
+additional keys into SONAME to indicate ABI change and avoid
+hard to diagnose crashes when user reinstalls libbfd.so
+built with different flags (see https://bugs.gentoo.org/663690).
+
+Bug: https://bugs.gentoo.org/666100
+Signed-off-by: Sergei Trofimovich <slyfox@gentoo.org>
+
+Ported to binutils 2.37 by Andreas K. Hüttel <dilfridge@gentoo.org>
+---
+ bfd/Makefile.am  |  5 +++++
+ bfd/Makefile.in  |  4 ++++
+ bfd/configure    | 17 +++++++++++++++--
+ bfd/configure.ac |  7 +++++++
+ 4 files changed, 31 insertions(+), 2 deletions(-)
+
+diff --git a/bfd/Makefile.am b/bfd/Makefile.am
+index 4987ac9cccc..23de1c6b5d7 100644
+--- a/bfd/Makefile.am
++++ b/bfd/Makefile.am
+@@ -64,6 +64,8 @@ bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
+ LIBDL = @lt_cv_dlopen_libs@
+ endif
+ 
++EXTRA_SOVERSION_SUFFIX = @EXTRA_SOVERSION_SUFFIX@
++
+ # bfd.h goes here, for now
+ BFD_H = bfd.h
+ 
+@@ -995,6 +997,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+ 	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
+ 	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
+ 	fi ;\
++	if test x"$(EXTRA_SOVERSION_SUFFIX)" != x ; then \
++	  bfd_soversion="$${bfd_soversion}.$(EXTRA_SOVERSION_SUFFIX)" ;\
++	fi ;\
+ 	$(SED) -e "s,@bfd_version@,$$bfd_version," \
+ 	    -e "s,@bfd_version_string@,$$bfd_version_string," \
+ 	    -e "s,@bfd_version_package@,$$bfd_version_package," \
+diff --git a/bfd/Makefile.in b/bfd/Makefile.in
+index 8a670ad1d05..2218f61e604 100644
+--- a/bfd/Makefile.in
++++ b/bfd/Makefile.in
+@@ -347,6 +347,7 @@ ECHO_T = @ECHO_T@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ EXEEXT_FOR_BUILD = @EXEEXT_FOR_BUILD@
++EXTRA_SOVERSION_SUFFIX = @EXTRA_SOVERSION_SUFFIX@
+ FGREP = @FGREP@
+ GENCAT = @GENCAT@
+ GMSGFMT = @GMSGFMT@
+@@ -2464,6 +2465,9 @@ bfdver.h: $(srcdir)/version.h $(srcdir)/development.sh $(srcdir)/Makefile.in
+ 	  bfd_version_string="\"$(VERSION).$${bfd_version_date}\"" ;\
+ 	  bfd_soversion="$(VERSION).$${bfd_version_date}" ;\
+ 	fi ;\
++	if test x"$(EXTRA_SOVERSION_SUFFIX)" != x ; then \
++	  bfd_soversion="$${bfd_soversion}.$(EXTRA_SOVERSION_SUFFIX)" ;\
++	fi ;\
+ 	$(SED) -e "s,@bfd_version@,$$bfd_version," \
+ 	    -e "s,@bfd_version_string@,$$bfd_version_string," \
+ 	    -e "s,@bfd_version_package@,$$bfd_version_package," \
+diff --git a/bfd/configure b/bfd/configure
+index 86561b30ac4..317c2f44982 100755
+--- a/bfd/configure
++++ b/bfd/configure
+@@ -701,6 +701,7 @@ WARN_CFLAGS
+ REPORT_BUGS_TEXI
+ REPORT_BUGS_TO
+ PKGVERSION
++EXTRA_SOVERSION_SUFFIX
+ DEBUGDIR
+ PLUGINS_FALSE
+ PLUGINS_TRUE
+@@ -840,6 +841,7 @@ enable_secureplt
+ enable_separate_code
+ enable_leading_mingw64_underscores
+ with_separate_debug_dir
++with_extra_soversion_suffix
+ with_pkgversion
+ with_bugurl
+ enable_werror
+@@ -1528,6 +1530,8 @@ Optional Packages:
+   --with-separate-debug-dir=DIR
+                           Look for global separate debug info in DIR
+                           [[default=LIBDIR/debug]]
++  --with-extra-soversion-suffix=SUFFIX
++                          Append '.SUFFIX' to SONAME [[default=]]
+   --with-pkgversion=PKG   Use PKG in the version string in place of "GNU
+                           Binutils"
+   --with-bugurl=URL       Direct users to URL to report a bug
+@@ -11153,7 +11157,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11156 "configure"
++#line 11160 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -11259,7 +11263,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 11262 "configure"
++#line 11266 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -12030,6 +12034,15 @@ fi
+ 
+ 
+ 
++EXTRA_SOVERSION_SUFFIX=
++
++# Check whether --with-extra-soversion-suffix was given.
++if test "${with_extra_soversion_suffix+set}" = set; then :
++  withval=$with_extra_soversion_suffix; EXTRA_SOVERSION_SUFFIX="${withval}"
++fi
++
++
++
+ 
+ 
+ # Check whether --with-pkgversion was given.
+diff --git a/bfd/configure.ac b/bfd/configure.ac
+index 5879a04785d..3e40e9476a7 100644
+--- a/bfd/configure.ac
++++ b/bfd/configure.ac
+@@ -173,6 +173,13 @@ AC_ARG_WITH(separate-debug-dir,
+ [DEBUGDIR="${withval}"])
+ AC_SUBST(DEBUGDIR)
+ 
++EXTRA_SOVERSION_SUFFIX=
++AC_ARG_WITH(extra-soversion-suffix,
++  AS_HELP_STRING([--with-extra-soversion-suffix=SUFFIX],
++                 [Append '.SUFFIX' to SONAME [[default=]]]),
++[EXTRA_SOVERSION_SUFFIX="${withval}"])
++AC_SUBST(EXTRA_SOVERSION_SUFFIX)
++
+ ACX_PKGVERSION([GNU Binutils])
+ ACX_BUGURL([https://sourceware.org/bugzilla/])
+ 
+-- 
+2.49.1
+
